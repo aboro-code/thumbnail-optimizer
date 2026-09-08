@@ -58,6 +58,3 @@ docker-compose up --build -d
 ```
 - Web Dashboard: `http://localhost:3000`
 - API Docs: `http://localhost:5000/api-docs`
-
-## License
-Distributed under the MIT License. See `LICENSE` for details.
