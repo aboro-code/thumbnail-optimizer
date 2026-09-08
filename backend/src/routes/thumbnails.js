@@ -13,6 +13,8 @@ const Thumbnail = require("../models/Thumbnail");
 const router = express.Router();
 
 const MIN_FILES_PER_BATCH = 2;
+const THUMBNAIL_STATUSES = ["UPLOADED", "SCORED", "TESTING", "COMPLETED"];
+const PRIVILEGED_ROLES = ["Manager", "Admin"];
 const UPLOAD_DIR = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.join(__dirname, "..", "..", "uploads");
@@ -96,5 +98,46 @@ router.post(
     }
   }
 );
+
+// GET /api/v1/thumbnails
+router.get("/", requireAuth, async (req, res) => {
+  const { status } = req.query;
+
+  if (status && !THUMBNAIL_STATUSES.includes(status)) {
+    return res.status(400).json({ message: `status must be one of ${THUMBNAIL_STATUSES.join(", ")}` });
+  }
+
+  const filter = PRIVILEGED_ROLES.includes(req.user.role) ? {} : { user_id: req.user.sub };
+  if (status) filter.status = status;
+
+  try {
+    const thumbnails = await Thumbnail.find(filter).sort({ uploaded_at: -1 });
+    res.json({ thumbnails });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch thumbnails" });
+  }
+});
+
+// GET /api/v1/thumbnails/:id
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const thumbnail = await Thumbnail.findById(req.params.id);
+    if (!thumbnail) {
+      return res.status(404).json({ message: "Thumbnail not found" });
+    }
+
+    const isOwner = thumbnail.user_id.toString() === req.user.sub;
+    if (!isOwner && !PRIVILEGED_ROLES.includes(req.user.role)) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
+
+    res.json(thumbnail);
+  } catch (err) {
+    if (err.name === "CastError") {
+      return res.status(400).json({ message: "Invalid thumbnail id" });
+    }
+    res.status(500).json({ message: "Failed to fetch thumbnail" });
+  }
+});
 
 module.exports = router;
