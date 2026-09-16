@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: "3.10"
       - run: pip install -r requirements.txt
-      - run: pytest --collect-only -q || true
+      - run: pytest -q
 
   frontend:
     runs-on: ubuntu-latest
