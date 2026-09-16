@@ -6,8 +6,9 @@ const express = require("express");
 const multer = require("multer");
 
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { upload, ALLOWED_MIME_TYPES } = require("../middleware/upload");
+const { upload, ALLOWED_MIME_TYPES, EXTENSION_BY_MIME } = require("../middleware/upload");
 const { detectImageMime } = require("../utils/imageSignature");
+const { UPLOAD_DIR } = require("../config/uploadDir");
 const Thumbnail = require("../models/Thumbnail");
 
 const router = express.Router();
@@ -15,16 +16,6 @@ const router = express.Router();
 const MIN_FILES_PER_BATCH = 2;
 const THUMBNAIL_STATUSES = ["UPLOADED", "SCORED", "TESTING", "COMPLETED"];
 const PRIVILEGED_ROLES = ["Manager", "Admin"];
-const UPLOAD_DIR = process.env.UPLOAD_DIR
-  ? path.resolve(process.env.UPLOAD_DIR)
-  : path.join(__dirname, "..", "..", "uploads");
-const EXTENSION_BY_MIME = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-};
-
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 function handleMulterErrors(err, req, res, next) {
   if (err instanceof multer.MulterError) {

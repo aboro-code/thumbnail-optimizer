@@ -1,11 +1,17 @@
 from typing import Optional
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE_BYTES
 from app.models.schemas import ScoreResponse
+from app.services.cv_engine import extract_thumbnail_features
+from app.services.scoring_engine import HeuristicCVScoringStrategy, derive_explanation_signals
 
 router = APIRouter(prefix="/api/v1", tags=["scoring"])
+
+_scoring_strategy = HeuristicCVScoringStrategy()
 
 
 @router.post("/score", response_model=ScoreResponse)
@@ -28,4 +34,13 @@ async def score_thumbnail(
     if len(contents) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="File must be 10MB or smaller")
 
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    buffer = np.frombuffer(contents, dtype=np.uint8)
+    image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Could not decode image file")
+
+    features = extract_thumbnail_features(image)
+    ctr_score = _scoring_strategy.score(features)
+    explanation_signals = derive_explanation_signals(features)
+
+    return ScoreResponse(ctr_score=ctr_score, explanation_signals=explanation_signals)
