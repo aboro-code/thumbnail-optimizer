@@ -3,10 +3,12 @@ from typing import Optional
 import cv2
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app.config import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE_BYTES
 from app.models.schemas import ScoreResponse
 from app.services.cv_engine import extract_thumbnail_features
+from app.services.rag_explainer import generate_explanation
 from app.services.scoring_engine import HeuristicCVScoringStrategy, derive_explanation_signals
 
 router = APIRouter(prefix="/api/v1", tags=["scoring"])
@@ -42,5 +44,10 @@ async def score_thumbnail(
     features = extract_thumbnail_features(image)
     ctr_score = _scoring_strategy.score(features)
     explanation_signals = derive_explanation_signals(features)
+    explanation_text = await run_in_threadpool(generate_explanation, ctr_score, explanation_signals)
 
-    return ScoreResponse(ctr_score=ctr_score, explanation_signals=explanation_signals)
+    return ScoreResponse(
+        ctr_score=ctr_score,
+        explanation_signals=explanation_signals,
+        explanation_text=explanation_text,
+    )
