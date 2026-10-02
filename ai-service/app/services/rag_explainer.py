@@ -1,13 +1,17 @@
 """LLM-generated explanation text via a local Ollama model. Per docs/PRD.md §9.2.
 
-This is generation only, for now - there is no retrieval/knowledge-base
-grounding yet, so this is the "G" half of RAG, not the full pipeline.
-Runs entirely on-machine (no external API call) via Ollama's local server.
+Full RAG pipeline: knowledge_base.py retrieves the thumbnail best-practice
+passages most relevant to what was actually detected, and this module asks
+the local model to generate an explanation grounded in them - the retrieval
+step is what keeps generation tied to real guidance instead of the model
+free-associating. Both retrieval and generation run entirely on-machine via
+Ollama's local server; no external API call is made.
 """
 
 import httpx
 
 from app.config import OLLAMA_MODEL, OLLAMA_TIMEOUT_SECONDS, OLLAMA_URL
+from app.services.knowledge_base import retrieve_relevant_passages
 
 
 def generate_explanation(ctr_score: float, explanation_signals: list) -> str:
@@ -17,11 +21,21 @@ def generate_explanation(ctr_score: float, explanation_signals: list) -> str:
     the local model is unreachable or errors, per the PRD's §1.13 fallback
     strategy for LLM calls.
     """
+    retrieved_passages = retrieve_relevant_passages(explanation_signals)
+
+    context = ""
+    if retrieved_passages:
+        context = "Relevant design guidance:\n" + "\n".join(
+            f"- {passage}" for passage in retrieved_passages
+        ) + "\n\n"
+
     prompt = (
+        f"{context}"
         f"A thumbnail image scored {ctr_score} out of 100 for predicted "
         f"click-through rate. Detected visual signals: {', '.join(explanation_signals)}. "
-        "In one short, plain-language sentence, explain this score to a "
-        "content creator who is not technical."
+        "Using the design guidance above where relevant, write one short, "
+        "plain-language sentence explaining this score to a content creator "
+        "who is not technical."
     )
 
     try:
