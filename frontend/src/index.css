@@ -1,3 +1,69 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark is the default theme. Light is applied with data-theme="light" on <html>. */
+:root {
+  --background: #0b1118;
+  --foreground: #edf2f8;
+  --card: #131b25;
+  --card-foreground: #edf2f8;
+  --popover: #1a2532;
+  --popover-foreground: #edf2f8;
+  --primary: #ff5c61;
+  --primary-foreground: #ffffff;
+  --secondary: #1a2532;
+  --secondary-foreground: #edf2f8;
+  --muted: #1a2532;
+  --muted-foreground: #abb6c4;
+  --accent: #22303f;
+  --accent-foreground: #edf2f8;
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: #263240;
+  --input: #2d3948;
+  --ring: #ff5c61;
+  --radius: 0.5rem;
+  --chart-1: #ff5c61;
+  --chart-2: #5083f1;
+  --chart-3: #fbbd23;
+  --chart-4: #36d399;
+  --chart-5: #a689fa;
+  --font-sans: Inter, sans-serif;
+  --font-mono: Consolas, monospace;
+}
+
+:root[data-theme="light"] {
+  --background: #f6f7f9;
+  --foreground: #1f252e;
+  --card: #ffffff;
+  --card-foreground: #1f252e;
+  --popover: #ffffff;
+  --popover-foreground: #1f252e;
+  --primary: #e51f26;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f2f5;
+  --secondary-foreground: #1f252e;
+  --muted: #f0f2f5;
+  --muted-foreground: #6e7681;
+  --accent: #fdeded;
+  --accent-foreground: #b8141a;
+  --destructive: hsl(0 84.2% 60.2%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: #e4e8ec;
+  --input: #e4e8ec;
+  --ring: #e51f26;
+  --radius: 0.5rem;
+  --chart-1: #e51f26;
+  --chart-2: #2463eb;
+  --chart-3: #f59f0a;
+  --chart-4: #10b77f;
+  --chart-5: #895af6;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

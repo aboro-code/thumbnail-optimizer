@@ -1,9 +1,37 @@
-function App() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-2xl font-semibold">Thumbnail Optimizer</h1>
-    </div>
-  );
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import CompleteProfilePage from "./pages/CompleteProfilePage";
+import DashboardPage from "./pages/DashboardPage";
+import LoginPage from "./pages/LoginPage";
+import { getToken } from "./lib/api";
+
+function RequireAuth({ children }) {
+  return getToken() ? children : <Navigate to="/login" replace />;
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/complete-profile"
+          element={
+            <RequireAuth>
+              <CompleteProfilePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
