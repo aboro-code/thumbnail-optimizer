@@ -4,8 +4,16 @@ const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 
 const User = require("../models/User");
+const { requireAuth } = require("../middleware/auth");
+const { verifyGoogleCredential } = require("../services/googleAuth");
 
 const router = express.Router();
+
+const PROFILE_ROLES = ["Creator", "Manager"];
+
+function publicUser(user) {
+  return { id: user._id, email: user.email, role: user.role, name: user.name };
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -39,7 +47,7 @@ router.post("/signup", authLimiter, async (req, res) => {
       .status(400)
       .json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
   }
-  if (role && !["Creator", "Manager", "Admin"].includes(role)) {
+  if (role && !PROFILE_ROLES.includes(role)) {
     return res.status(400).json({ message: "Invalid role" });
   }
 
@@ -72,7 +80,7 @@ router.post("/login", authLimiter, async (req, res) => {
 
   try {
     const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
+    if (!user || !user.password_hash) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
@@ -88,6 +96,89 @@ router.post("/login", authLimiter, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to log in" });
+  }
+});
+
+// POST /api/v1/auth/google
+// Finds the account by Google ID, or by email (merging a Google sign-in into an
+// existing email/password account), or creates one. New accounts must complete
+// their profile before they're sent to the dashboard.
+router.post("/google", authLimiter, async (req, res) => {
+  const { credential } = req.body || {};
+  if (!credential) {
+    return res.status(400).json({ message: "A Google credential is required" });
+  }
+
+  let profile;
+  try {
+    profile = await verifyGoogleCredential(credential);
+  } catch (err) {
+    return res.status(401).json({ message: "Google sign-in could not be verified" });
+  }
+  if (!profile.emailVerified) {
+    return res.status(401).json({ message: "This Google account's email is not verified" });
+  }
+
+  try {
+    let user = await User.findOne({ google_id: profile.googleId });
+    if (!user) {
+      user = await User.findOne({ email: profile.email.toLowerCase() });
+    }
+
+    if (!user) {
+      user = await User.create({
+        email: profile.email,
+        google_id: profile.googleId,
+        name: profile.name,
+        profile_complete: false,
+      });
+    } else if (!user.google_id) {
+      user.google_id = profile.googleId;
+      await user.save();
+    } else if (user.google_id !== profile.googleId) {
+      return res.status(409).json({ message: "This email is linked to a different Google account" });
+    }
+
+    res.json({
+      token: signToken(user),
+      user: publicUser(user),
+      needs_profile: !user.profile_complete,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to sign in with Google" });
+  }
+});
+
+// PATCH /api/v1/auth/profile
+// Completes a new Google account. Only allowed while the profile is incomplete,
+// so a finished account can't use this to change its own role.
+router.patch("/profile", requireAuth, async (req, res) => {
+  const { name, role } = req.body || {};
+
+  if (typeof name !== "string" || name.trim().length < 2) {
+    return res.status(400).json({ message: "Name must be at least 2 characters" });
+  }
+  if (!PROFILE_ROLES.includes(role)) {
+    return res.status(400).json({ message: "Choose Creator or Manager" });
+  }
+
+  try {
+    const user = await User.findById(req.user.sub);
+    if (!user) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+    if (user.profile_complete) {
+      return res.status(403).json({ message: "Profile is already complete" });
+    }
+
+    user.name = name.trim();
+    user.role = role;
+    user.profile_complete = true;
+    await user.save();
+
+    res.json({ token: signToken(user), user: publicUser(user), needs_profile: false });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to save profile" });
   }
 });
 
