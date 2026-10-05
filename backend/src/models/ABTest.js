@@ -19,7 +19,7 @@ const abTestSchema = new mongoose.Schema({
   end_date: { type: Date, required: true },
   variants: [variantSchema],
   winner_variant_id: { type: mongoose.Schema.Types.ObjectId, default: null },
-});
+}, { timestamps: true });
 
 abTestSchema.index({ status: 1 });
 
