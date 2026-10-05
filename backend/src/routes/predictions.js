@@ -68,8 +68,8 @@ router.post("/analyze", requireAuth, async (req, res) => {
   try {
     scored = await Promise.all(
       thumbnails.map(async (thumbnail) => {
-        const { ctr_score, explanation_signals } = await scoreOneThumbnail(thumbnail);
-        return { thumbnail, ctr_score, explanation_signals };
+        const { ctr_score, explanation_signals, explanation_text } = await scoreOneThumbnail(thumbnail);
+        return { thumbnail, ctr_score, explanation_signals, explanation_text };
       })
     );
   } catch (err) {
@@ -82,12 +82,13 @@ router.post("/analyze", requireAuth, async (req, res) => {
   });
 
   const results = await Promise.all(
-    scored.map(async ({ thumbnail, ctr_score, rank, explanation_signals }) => {
+    scored.map(async ({ thumbnail, ctr_score, rank, explanation_signals, explanation_text }) => {
       await Prediction.create({
         thumbnail_id: thumbnail._id,
         ctr_score,
         rank,
         explanation_signals,
+        explanation_text,
       });
       thumbnail.status = "SCORED";
       await thumbnail.save();
@@ -97,6 +98,7 @@ router.post("/analyze", requireAuth, async (req, res) => {
         ctr_score,
         rank,
         explanation_signals,
+        explanation_text,
       };
     })
   );

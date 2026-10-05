@@ -31,7 +31,11 @@ function startMockAiService() {
     const title = req.body.content_title || "";
     const match = title.match(/score:(\d+(\.\d+)?)/);
     const ctr_score = match ? parseFloat(match[1]) : 50;
-    res.json({ ctr_score, explanation_signals: [`mock signal for ${title || "untitled"}`] });
+    res.json({
+      ctr_score,
+      explanation_signals: [`mock signal for ${title || "untitled"}`],
+      explanation_text: `mock explanation for ${title || "untitled"}`,
+    });
   });
   return new Promise((resolve) => {
     const server = mockAi.listen(18321, () => resolve(server));
@@ -88,8 +92,12 @@ describe("POST /api/v1/predictions/analyze", () => {
     expect(highResult.ctr_score).toBe(90);
     expect(lowResult.ctr_score).toBe(40);
 
+    expect(highResult.explanation_text).toBe("mock explanation for score:90");
+
     const saved = await Prediction.find({});
     expect(saved).toHaveLength(2);
+    const savedHigh = saved.find((p) => p.thumbnail_id.toString() === high._id.toString());
+    expect(savedHigh.explanation_text).toBe("mock explanation for score:90");
 
     const updatedThumb = await Thumbnail.findById(high._id);
     expect(updatedThumb.status).toBe("SCORED");
