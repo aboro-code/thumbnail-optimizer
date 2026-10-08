@@ -310,3 +310,162 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("GET /api/v1/abtests", () => {
+  it("only returns the requesting Creator's own tests", async () => {
+    const ownerA = new mongoose.Types.ObjectId().toString();
+    const ownerB = new mongoose.Types.ObjectId().toString();
+    const a1 = await createThumbnail(ownerA);
+    const a2 = await createThumbnail(ownerA);
+    const b1 = await createThumbnail(ownerB);
+    const b2 = await createThumbnail(ownerB);
+    await ABTest.create({
+      created_by: ownerA,
+      content_reference: "a",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: a1._id }, { thumbnail_id: a2._id }],
+    });
+    await ABTest.create({
+      created_by: ownerB,
+      content_reference: "b",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: b1._id }, { thumbnail_id: b2._id }],
+    });
+
+    const res = await request(app)
+      .get("/api/v1/abtests")
+      .set("Authorization", `Bearer ${tokenFor("Creator", ownerA)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ab_tests).toHaveLength(1);
+    expect(res.body.ab_tests[0].content_reference).toBe("a");
+    expect(res.body.ab_tests[0].variant_count).toBe(2);
+  });
+
+  it("lets a Manager see tests from every user", async () => {
+    const ownerA = new mongoose.Types.ObjectId().toString();
+    const ownerB = new mongoose.Types.ObjectId().toString();
+    const a1 = await createThumbnail(ownerA);
+    const a2 = await createThumbnail(ownerA);
+    const b1 = await createThumbnail(ownerB);
+    const b2 = await createThumbnail(ownerB);
+    await ABTest.create({
+      created_by: ownerA,
+      content_reference: "a",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: a1._id }, { thumbnail_id: a2._id }],
+    });
+    await ABTest.create({
+      created_by: ownerB,
+      content_reference: "b",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: b1._id }, { thumbnail_id: b2._id }],
+    });
+
+    const res = await request(app)
+      .get("/api/v1/abtests")
+      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ab_tests).toHaveLength(2);
+  });
+
+  it("filters by status", async () => {
+    const owner = new mongoose.Types.ObjectId().toString();
+    const t1 = await createThumbnail(owner);
+    const t2 = await createThumbnail(owner);
+    await ABTest.create({
+      created_by: owner,
+      content_reference: "running",
+      status: "RUNNING",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: t1._id }, { thumbnail_id: t2._id }],
+    });
+    await ABTest.create({
+      created_by: owner,
+      content_reference: "cancelled",
+      status: "CANCELLED",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: t1._id }, { thumbnail_id: t2._id }],
+    });
+
+    const res = await request(app)
+      .get("/api/v1/abtests?status=CANCELLED")
+      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ab_tests).toHaveLength(1);
+    expect(res.body.ab_tests[0].content_reference).toBe("cancelled");
+  });
+
+  it("rejects an invalid status filter", async () => {
+    const res = await request(app)
+      .get("/api/v1/abtests?status=NOT_A_STATUS")
+      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/v1/abtests/:id", () => {
+  it("returns the test with populated variant thumbnails", async () => {
+    const owner = new mongoose.Types.ObjectId().toString();
+    const a = await createThumbnail(owner);
+    const b = await createThumbnail(owner);
+    const test = await ABTest.create({
+      created_by: owner,
+      content_reference: "ref",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: a._id }, { thumbnail_id: b._id }],
+    });
+
+    const res = await request(app)
+      .get(`/api/v1/abtests/${test._id}`)
+      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.variants[0].thumbnail_id.image_url).toBe("/uploads/a.jpg");
+  });
+
+  it("blocks a different Creator from viewing someone else's test", async () => {
+    const owner = new mongoose.Types.ObjectId().toString();
+    const a = await createThumbnail(owner);
+    const b = await createThumbnail(owner);
+    const test = await ABTest.create({
+      created_by: owner,
+      content_reference: "ref",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: a._id }, { thumbnail_id: b._id }],
+    });
+
+    const res = await request(app)
+      .get(`/api/v1/abtests/${test._id}`)
+      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 404 for a well-formed but unknown id", async () => {
+    const res = await request(app)
+      .get(`/api/v1/abtests/${new mongoose.Types.ObjectId()}`)
+      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for a malformed id", async () => {
+    const res = await request(app)
+      .get("/api/v1/abtests/not-an-id")
+      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+
+    expect(res.status).toBe(400);
+  });
+});

@@ -10,6 +10,7 @@ const router = express.Router();
 
 const PRIVILEGED_ROLES = ["Manager", "Admin"];
 const MIN_VARIANTS = 2;
+const STATUSES = ["RUNNING", "COMPLETED", "CANCELLED"];
 
 function isOwnerOrPrivileged(req, ownerId) {
   return PRIVILEGED_ROLES.includes(req.user.role) || ownerId.toString() === req.user.sub;
@@ -67,6 +68,57 @@ router.post("/", requireAuth, requireRole("Creator", "Manager", "Admin"), async 
     status: abTest.status,
     variants: abTest.variants.length,
   });
+});
+
+// GET /api/v1/abtests
+// Not part of the documented §7 API contract, but needed for the /abtests
+// list page (§3.1) - mirrors the scoping pattern used by GET /thumbnails.
+router.get("/", requireAuth, async (req, res) => {
+  const { status } = req.query;
+  if (status && !STATUSES.includes(status)) {
+    return res.status(400).json({ message: `status must be one of ${STATUSES.join(", ")}` });
+  }
+
+  const filter = PRIVILEGED_ROLES.includes(req.user.role) ? {} : { created_by: req.user.sub };
+  if (status) filter.status = status;
+
+  const tests = await ABTest.find(filter).sort({ createdAt: -1 });
+
+  res.json({
+    ab_tests: tests.map((t) => ({
+      _id: t._id,
+      content_reference: t.content_reference,
+      status: t.status,
+      start_date: t.start_date,
+      end_date: t.end_date,
+      variant_count: t.variants.length,
+      winner_variant_id: t.winner_variant_id,
+      created_at: t.createdAt,
+    })),
+  });
+});
+
+// GET /api/v1/abtests/:id
+// Also not in §7 - needed for the /abtests/:id detail page (§3.1). Populates
+// each variant's thumbnail so the detail view doesn't need N extra requests.
+router.get("/:id", requireAuth, async (req, res) => {
+  let test;
+  try {
+    test = await ABTest.findById(req.params.id).populate({
+      path: "variants.thumbnail_id",
+      select: "image_url content_title status",
+    });
+  } catch (err) {
+    return res.status(400).json({ message: "Invalid ab test id" });
+  }
+  if (!test) {
+    return res.status(404).json({ message: "A/B test not found" });
+  }
+  if (!isOwnerOrPrivileged(req, test.created_by)) {
+    return res.status(403).json({ message: "Insufficient permissions" });
+  }
+
+  res.json(test);
 });
 
 // PATCH /api/v1/abtests/:id/variants/:variantId/metrics
