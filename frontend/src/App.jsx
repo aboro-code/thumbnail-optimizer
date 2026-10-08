@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import CompleteProfilePage from "./pages/CompleteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import OptimizePage from "./pages/OptimizePage";
+import UploadPage from "./pages/UploadPage";
 import { getToken } from "./lib/api";
 
 function RequireAuth({ children }) {
@@ -27,6 +29,22 @@ export default function App() {
           element={
             <RequireAuth>
               <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/thumbnails/new"
+          element={
+            <RequireAuth>
+              <UploadPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/thumbnails/optimize"
+          element={
+            <RequireAuth>
+              <OptimizePage />
             </RequireAuth>
           }
         />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, API_URL, clearToken } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
@@ -76,6 +76,12 @@ export default function DashboardPage() {
           <h1 className="mt-1 text-2xl font-semibold">Dashboard</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/thumbnails/new"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Upload thumbnails
+          </Link>
           <ThemeToggle />
           <button
             type="button"
