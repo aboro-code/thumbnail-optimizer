@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, setToken } from "../lib/api";
+import { api, setToken, setUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -32,6 +32,7 @@ export default function LoginPage() {
 
   function routeAfterSignIn(data) {
     setToken(data.token);
+    setUser(data.user);
     navigate(data.needs_profile ? "/complete-profile" : "/dashboard", { replace: true });
   }
 

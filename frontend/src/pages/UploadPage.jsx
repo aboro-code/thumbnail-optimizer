@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { api, clearToken } from "../lib/api";
+import { api, clearToken, clearUser } from "../lib/api";
 import { ALLOWED_TYPES, MAX_FILES, MAX_FILE_SIZE_BYTES, MIN_FILES } from "../lib/uploadLimits";
 import ThemeToggle from "../components/ThemeToggle";
 
@@ -75,6 +75,7 @@ export default function UploadPage() {
     } catch (err) {
       if (err.response?.status === 401) {
         clearToken();
+        clearUser();
         navigate("/login", { replace: true });
         return;
       }

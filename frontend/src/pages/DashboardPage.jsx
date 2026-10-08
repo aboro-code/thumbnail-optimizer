@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { api, API_URL, clearToken } from "../lib/api";
+import { api, API_URL, clearToken, clearUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
 const STATUS_STYLES = {
@@ -51,6 +51,7 @@ export default function DashboardPage() {
         if (cancelled) return;
         if (err.response?.status === 401) {
           clearToken();
+          clearUser();
           navigate("/login", { replace: true });
           return;
         }
@@ -63,6 +64,7 @@ export default function DashboardPage() {
 
   function signOut() {
     clearToken();
+    clearUser();
     navigate("/login", { replace: true });
   }
 
@@ -76,6 +78,12 @@ export default function DashboardPage() {
           <h1 className="mt-1 text-2xl font-semibold">Dashboard</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to="/abtests"
+            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            A/B tests
+          </Link>
           <Link
             to="/thumbnails/new"
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"

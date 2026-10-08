@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { api, API_URL, clearToken } from "../lib/api";
+import { api, API_URL, clearToken, clearUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
 function todayISO(offsetDays = 0) {
@@ -141,6 +141,7 @@ export default function OptimizePage() {
 
   function handleUnauthorized() {
     clearToken();
+    clearUser();
     navigate("/login", { replace: true });
   }
 
@@ -211,10 +212,10 @@ export default function OptimizePage() {
           {createdTest ? (
             <div className="rounded-lg border border-chart-4 bg-card p-4 text-sm">
               <p className="font-medium text-chart-4">Test started</p>
-              <p className="mt-1 text-muted-foreground">
-                Status: {createdTest.status}. Record engagement and close it from the API for now — the A/B
-                dashboard page is coming soon.
-              </p>
+              <p className="mt-1 text-muted-foreground">Status: {createdTest.status}.</p>
+              <Link to={`/abtests/${createdTest.ab_test_id}`} className="mt-2 inline-block text-primary hover:underline">
+                Go to test →
+              </Link>
             </div>
           ) : showTestForm ? (
             <StartTestForm items={items} onCreated={setCreatedTest} onUnauthorized={handleUnauthorized} />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, setToken } from "../lib/api";
+import { api, setToken, setUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
 const ROLE_OPTIONS = [
@@ -31,6 +31,7 @@ export default function CompleteProfilePage() {
     try {
       const res = await api.patch("/auth/profile", { name, role });
       setToken(res.data.token);
+      setUser(res.data.user);
       navigate("/dashboard", { replace: true });
     } catch (err) {
       if (err.response?.status === 403) {

@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import ABTestDetailPage from "./pages/ABTestDetailPage";
+import ABTestsListPage from "./pages/ABTestsListPage";
 import CompleteProfilePage from "./pages/CompleteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
@@ -45,6 +47,22 @@ export default function App() {
           element={
             <RequireAuth>
               <OptimizePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/abtests"
+          element={
+            <RequireAuth>
+              <ABTestsListPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/abtests/:id"
+          element={
+            <RequireAuth>
+              <ABTestDetailPage />
             </RequireAuth>
           }
         />
