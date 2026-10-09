@@ -1,4 +1,15 @@
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  skip: () => process.env.NODE_ENV === "test",
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.sub || req.ip,
+  message: { message: "Too many requests. Please slow down." },
+});
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -10,10 +21,11 @@ function requireAuth(req, res, next) {
 
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
+
+  apiLimiter(req, res, next);
 }
 
 function requireRole(...roles) {
