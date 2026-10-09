@@ -34,8 +34,8 @@ function VariantRow({ variant, abTestId, isWinner, onSaved, onUnauthorized }) {
 
   return (
     <li className={`rounded-lg border p-4 ${isWinner ? "border-chart-4" : "border-border"} bg-card`}>
-      <div className="flex gap-4">
-        <div className="aspect-video w-32 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="aspect-video w-full flex-shrink-0 overflow-hidden rounded-md bg-muted sm:w-32">
           {thumb?.image_url && (
             <img src={`${API_URL}${thumb.image_url}`} alt="" className="h-full w-full object-cover" />
           )}
