@@ -28,6 +28,11 @@ env/
 frontend/build/
 frontend/dist/
 
+# --- Survey dataset: raw export has respondent emails, images are third-party thumbnails ---
+ai-service/data/raw/
+ai-service/data/images/
+ai-service/data/interim/
+
 # --- Uploaded media (local dev only) ---
 uploads/
 *.local
