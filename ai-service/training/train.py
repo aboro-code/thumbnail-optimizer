@@ -76,7 +76,14 @@ def fit(pairs: list, l2: float = L2_STRENGTH, iterations: int = 50) -> dict:
         if np.abs(step).max() < 1e-10:
             break
 
-    return {"features": FEATURES, "scale": scale.tolist(), "weights": w.tolist(), "l2": l2}
+    # center = the average survey thumbnail; serving scores it at 50 (see trained_scoring.py)
+    return {
+        "features": FEATURES,
+        "center": thumbnails.mean(axis=0).tolist(),
+        "scale": scale.tolist(),
+        "weights": w.tolist(),
+        "l2": l2,
+    }
 
 
 def prob_left(model: dict, left: np.ndarray, right: np.ndarray) -> float:

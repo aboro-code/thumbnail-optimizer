@@ -5,15 +5,16 @@ import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
-from app.config import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE_BYTES
+from app.config import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE_BYTES, SCORING_STRATEGY
 from app.models.schemas import ScoreResponse
 from app.services.cv_engine import extract_thumbnail_features
 from app.services.rag_explainer import generate_explanation
-from app.services.scoring_engine import HeuristicCVScoringStrategy, derive_explanation_signals
+from app.services.scoring_engine import derive_explanation_signals
+from app.services.trained_scoring import select_scoring_strategy
 
 router = APIRouter(prefix="/api/v1", tags=["scoring"])
 
-_scoring_strategy = HeuristicCVScoringStrategy()
+_scoring_strategy = select_scoring_strategy(SCORING_STRATEGY)
 
 
 @router.post("/score", response_model=ScoreResponse)
