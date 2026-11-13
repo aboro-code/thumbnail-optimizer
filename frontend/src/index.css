@@ -29,6 +29,7 @@
   --chart-3: #fbbd23;
   --chart-4: #36d399;
   --chart-5: #a689fa;
+  --chart-muted: #4a5566; /* de-emphasised bars next to a --chart-2 highlight */
   --font-sans: Inter, sans-serif;
   --font-mono: Consolas, monospace;
 }
@@ -60,6 +61,7 @@
   --chart-3: #f59f0a;
   --chart-4: #047857;
   --chart-5: #895af6;
+  --chart-muted: #c3c9d1;
 }
 
 body {
