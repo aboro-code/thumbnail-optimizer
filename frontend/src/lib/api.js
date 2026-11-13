@@ -36,6 +36,35 @@ export function setUser(user) {
 
 export function clearUser() {
   localStorage.removeItem(USER_KEY);
+  clearOptimizeSession();
+}
+
+// The Optimize page's results (scored candidates + any test started from them),
+// kept per browser tab so a refresh doesn't lose them or allow a duplicate test.
+const OPTIMIZE_KEY = "thumbnail-optimizer-optimize";
+
+export function getOptimizeSession() {
+  try {
+    return JSON.parse(sessionStorage.getItem(OPTIMIZE_KEY));
+  } catch (err) {
+    return null;
+  }
+}
+
+export function setOptimizeSession(session) {
+  try {
+    sessionStorage.setItem(OPTIMIZE_KEY, JSON.stringify(session));
+  } catch (err) {
+    // storage full or blocked: the page still works, it just won't survive a refresh
+  }
+}
+
+export function clearOptimizeSession() {
+  try {
+    sessionStorage.removeItem(OPTIMIZE_KEY);
+  } catch (err) {
+    // nothing to clear
+  }
 }
 
 api.interceptors.request.use((config) => {

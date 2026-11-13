@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { api, API_URL, clearToken, clearUser } from "../lib/api";
+import { api, API_URL, clearToken, clearUser, getOptimizeSession, setOptimizeSession } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 
 function todayISO(offsetDays = 0) {
@@ -109,12 +109,19 @@ function StartTestForm({ items, onCreated, onUnauthorized }) {
 export default function OptimizePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const items = location.state?.items;
-  const contentTitle = location.state?.content_title;
+  // Fresh results arrive as router state from the upload page; after a refresh
+  // router state is gone, so fall back to the copy saved for this tab.
+  const [session] = useState(() => (location.state?.items ? location.state : getOptimizeSession()));
+  const items = session?.items;
+  const contentTitle = session?.content_title;
 
   const [selectedId, setSelectedId] = useState(items?.[0]?._id);
   const [showTestForm, setShowTestForm] = useState(false);
-  const [createdTest, setCreatedTest] = useState(null);
+  const [createdTest, setCreatedTest] = useState(session?.created_test || null);
+
+  useEffect(() => {
+    if (session?.items) setOptimizeSession({ ...session, created_test: createdTest });
+  }, [session, createdTest]);
 
   if (!items || items.length === 0) {
     return (
@@ -165,6 +172,7 @@ export default function OptimizePage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId(item._id)}
+                  aria-pressed={item._id === selected._id}
                   className={`relative block w-full overflow-hidden rounded-lg border bg-card text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
                     item._id === selected._id ? "border-primary ring-2 ring-primary" : "border-border"
                   }`}
@@ -172,7 +180,7 @@ export default function OptimizePage() {
                   <div className="aspect-video w-full bg-muted">
                     <img
                       src={`${API_URL}${item.image_url}`}
-                      alt={item.content_title || "Candidate thumbnail"}
+                      alt={`Candidate ranked #${item.rank}, score ${item.ctr_score.toFixed(1)}`}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -210,7 +218,7 @@ export default function OptimizePage() {
           </div>
 
           {createdTest ? (
-            <div className="rounded-lg border border-chart-4 bg-card p-4 text-sm">
+            <div role="status" className="rounded-lg border border-chart-4 bg-card p-4 text-sm">
               <p className="font-medium text-chart-4">Test started</p>
               <p className="mt-1 text-muted-foreground">Status: {createdTest.status}.</p>
               <Link to={`/abtests/${createdTest.ab_test_id}`} className="mt-2 inline-block text-primary hover:underline">
