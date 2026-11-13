@@ -125,7 +125,14 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-dashed border-border p-6 text-center">
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            addFiles(e.dataTransfer.files);
+          }}
+          className="rounded-lg border border-dashed border-border p-6 text-center focus-within:outline focus-within:outline-2 focus-within:outline-ring"
+        >
           <label htmlFor="files" className="cursor-pointer text-sm">
             <span className="font-medium text-primary">Choose images</span>
             <span className="text-muted-foreground"> or drag them here — {MIN_FILES} to {MAX_FILES} candidates, up to 10MB each</span>
@@ -148,7 +155,7 @@ export default function UploadPage() {
             {candidates.map((c, i) => (
               <li key={c.previewUrl} className="relative overflow-hidden rounded-lg border border-border bg-card">
                 <div className="aspect-video w-full bg-muted">
-                  <img src={c.previewUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={c.previewUrl} alt={`Preview of ${c.file.name}`} className="h-full w-full object-cover" />
                 </div>
                 <button
                   type="button"
@@ -188,6 +195,10 @@ export default function UploadPage() {
           {stage === "scoring" && "Scoring candidates…"}
           {stage === "" && "Upload and score"}
         </button>
+        <p role="status" className="sr-only">
+          {stage === "uploading" && "Uploading thumbnails"}
+          {stage === "scoring" && "Scoring candidates, this can take a few seconds"}
+        </p>
       </form>
     </div>
   );

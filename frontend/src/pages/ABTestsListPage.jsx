@@ -68,7 +68,7 @@ export default function ABTestsListPage() {
         </p>
       )}
 
-      {!error && tests === null && <p className="mt-8 text-sm text-muted-foreground">Loading…</p>}
+      {!error && tests === null && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
 
       {tests && tests.length === 0 && (
         <div className="mt-8 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">

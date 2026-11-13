@@ -107,7 +107,7 @@ export default function DashboardPage() {
         </p>
       )}
 
-      {!error && thumbnails === null && <p className="mt-8 text-sm text-muted-foreground">Loading…</p>}
+      {!error && thumbnails === null && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
 
       {thumbnails && (
         <>

@@ -11,7 +11,7 @@
   --popover: #1a2532;
   --popover-foreground: #edf2f8;
   --primary: #ff5c61;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #0b1118; /* white on #ff5c61 is only 3.0:1; this is 6.3:1 (WCAG AA) */
   --secondary: #1a2532;
   --secondary-foreground: #edf2f8;
   --muted: #1a2532;
@@ -33,6 +33,7 @@
   --font-mono: Consolas, monospace;
 }
 
+/* Light values darkened where needed so text meets WCAG AA (>= 4.5:1, PRD §3.4). */
 :root[data-theme="light"] {
   --background: #f6f7f9;
   --foreground: #1f252e;
@@ -40,24 +41,24 @@
   --card-foreground: #1f252e;
   --popover: #ffffff;
   --popover-foreground: #1f252e;
-  --primary: #e51f26;
+  --primary: #d71920;
   --primary-foreground: #ffffff;
   --secondary: #f0f2f5;
   --secondary-foreground: #1f252e;
   --muted: #f0f2f5;
-  --muted-foreground: #6e7681;
+  --muted-foreground: #636b77;
   --accent: #fdeded;
   --accent-foreground: #b8141a;
-  --destructive: hsl(0 84.2% 60.2%);
+  --destructive: #c81e1e;
   --destructive-foreground: hsl(210 40% 98%);
   --border: #e4e8ec;
   --input: #e4e8ec;
-  --ring: #e51f26;
+  --ring: #d71920;
   --radius: 0.5rem;
-  --chart-1: #e51f26;
+  --chart-1: #d71920;
   --chart-2: #2463eb;
   --chart-3: #f59f0a;
-  --chart-4: #10b77f;
+  --chart-4: #047857;
   --chart-5: #895af6;
 }
 
@@ -66,4 +67,10 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Visible keyboard focus on every interactive element (PRD §3.4 keyboard navigation). */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
