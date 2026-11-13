@@ -3,25 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { api, clearToken, clearUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
-
-const STATUS_STYLES = {
-  RUNNING: { label: "Running", color: "var(--chart-3)" },
-  COMPLETED: { label: "Completed", color: "var(--chart-4)" },
-  CANCELLED: { label: "Cancelled", color: "var(--muted-foreground)" },
-};
-
-function StatusPill({ status }) {
-  const style = STATUS_STYLES[status] || STATUS_STYLES.RUNNING;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium"
-      style={{ color: style.color }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: style.color }} aria-hidden="true" />
-      {style.label}
-    </span>
-  );
-}
+import StatusPill from "../components/StatusPill";
+import { RowListSkeleton } from "../components/Skeleton";
 
 export default function ABTestsListPage() {
   const navigate = useNavigate();
@@ -68,7 +51,11 @@ export default function ABTestsListPage() {
         </p>
       )}
 
-      {!error && tests === null && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
+      {!error && tests === null && (
+        <div className="mt-8">
+          <RowListSkeleton label="Loading A/B tests" />
+        </div>
+      )}
 
       {tests && tests.length === 0 && (
         <div className="mt-8 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">

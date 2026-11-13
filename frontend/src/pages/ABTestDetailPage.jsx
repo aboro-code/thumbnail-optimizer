@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { api, API_URL, clearToken, clearUser, getUser } from "../lib/api";
+import { downloadReport } from "../lib/download";
 import ThemeToggle from "../components/ThemeToggle";
+import BarList from "../components/BarList";
+import StatusPill from "../components/StatusPill";
+import { LoadingRegion, Skeleton } from "../components/Skeleton";
 
 const PRIVILEGED_ROLES = ["Manager", "Admin"];
 
-function VariantRow({ variant, abTestId, isWinner, onSaved, onUnauthorized }) {
+function VariantRow({ variant, label, abTestId, isWinner, isPredicted, onSaved, onUnauthorized }) {
   const thumb = variant.thumbnail_id; // populated by the backend
   const [impressions, setImpressions] = useState(variant.impressions);
   const [clicks, setClicks] = useState(variant.clicks);
@@ -41,8 +45,14 @@ function VariantRow({ variant, abTestId, isWinner, onSaved, onUnauthorized }) {
           )}
         </div>
         <div className="flex flex-1 flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">{thumb?.content_title || "Untitled"}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">
+              {label}
+              <span className="font-normal text-muted-foreground"> · {thumb?.content_title || "Untitled"}</span>
+            </p>
+            {isPredicted && (
+              <span className="rounded-full border border-border px-2 py-0.5 text-xs font-semibold text-foreground">AI pick</span>
+            )}
             {isWinner && (
               <span className="rounded-full bg-chart-4 px-2 py-0.5 text-xs font-semibold text-background">
                 Winner
@@ -143,21 +153,11 @@ function ExportReport({ abTestId, onUnauthorized }) {
   const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState("");
 
-  // The export needs the JWT header, so it's fetched as a blob rather than a plain link.
   async function download(format) {
     setError("");
     setDownloading(format);
     try {
-      const res = await api.get(`/reports/${abTestId}/export`, {
-        params: { format },
-        responseType: "blob",
-      });
-      const url = URL.createObjectURL(res.data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `abtest-${abTestId}.${format}`;
-      link.click();
-      URL.revokeObjectURL(url);
+      await downloadReport(abTestId, format);
     } catch (err) {
       if (err.response?.status === 401) {
         onUnauthorized();
@@ -188,6 +188,81 @@ function ExportReport({ abTestId, onUnauthorized }) {
   );
 }
 
+const variantLabel = (idx) => `Variant ${String.fromCharCode(65 + idx)}`;
+
+// The AI's pick = highest predicted score, but only when every variant was
+// scored (same rule as the backend's prediction check).
+function predictedIndex(variants) {
+  if (variants.length === 0 || variants.some((v) => v.predicted_ctr_score === null)) return null;
+  return variants.reduce((best, v, idx) => (v.predicted_ctr_score > variants[best].predicted_ctr_score ? idx : best), 0);
+}
+
+// Predicted vs actual, as two separate charts: the scales differ (score 0-100 vs
+// CTR %), and putting them on one plot with two axes would invent a correlation.
+function ResultsCharts({ test, predictedIdx }) {
+  const completed = test.status === "COMPLETED";
+  const winnerIdx = test.variants.findIndex((v) => v._id === test.winner_variant_id);
+
+  const ctrRows = test.variants.map((v, idx) => ({
+    key: v._id,
+    label: variantLabel(idx),
+    value: v.impressions > 0 ? v.measured_ctr * 100 : null,
+    highlight: idx === winnerIdx,
+    tag: idx === winnerIdx ? "Winner" : null,
+  }));
+  const scoreRows = test.variants.map((v, idx) => ({
+    key: v._id,
+    label: variantLabel(idx),
+    value: v.predicted_ctr_score,
+    highlight: idx === predictedIdx,
+    tag: idx === predictedIdx ? "AI pick" : null,
+  }));
+
+  let verdict = null;
+  if (completed && winnerIdx >= 0) {
+    verdict =
+      predictedIdx === null
+        ? "The prediction can't be checked: not every variant was scored."
+        : predictedIdx === winnerIdx
+          ? `The AI picked the winner (${variantLabel(winnerIdx)}).`
+          : `The AI picked ${variantLabel(predictedIdx)}, but ${variantLabel(winnerIdx)} won.`;
+  }
+
+  return (
+    <section className="mt-6" aria-labelledby="results-heading">
+      <h2 id="results-heading" className="text-lg font-semibold">
+        Predicted vs actual
+      </h2>
+      <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <BarList title="Predicted score (0–100)" rows={scoreRows} max={100} formatValue={(v) => v.toFixed(1)} />
+        <BarList
+          title="Measured CTR"
+          rows={ctrRows}
+          formatValue={(v) => `${v.toFixed(2)}%`}
+        />
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {verdict || (completed ? "" : "The winner is declared when the test closes. Variants with no impressions show —.")}
+      </p>
+    </section>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <LoadingRegion label="Loading A/B test" className="mt-6 flex flex-col gap-4">
+      <Skeleton className="h-4 w-56" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Skeleton className="h-36 w-full" />
+        <Skeleton className="h-36 w-full" />
+      </div>
+      {Array.from({ length: 2 }, (_, i) => (
+        <Skeleton key={i} className="h-28 w-full" />
+      ))}
+    </LoadingRegion>
+  );
+}
+
 export default function ABTestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -195,6 +270,7 @@ export default function ABTestDetailPage() {
   const [error, setError] = useState("");
   const [closeResult, setCloseResult] = useState(null);
   const user = getUser();
+  const predictedIdx = test ? predictedIndex(test.variants) : null;
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
@@ -245,22 +321,29 @@ export default function ABTestDetailPage() {
         </p>
       )}
 
-      {!error && !test && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
+      {!error && !test && <DetailSkeleton />}
 
       {test && (
         <>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {test.status} · {new Date(test.start_date).toLocaleDateString()} –{" "}
-            {new Date(test.end_date).toLocaleDateString()}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <StatusPill status={test.status} />
+            <span>
+              {new Date(test.start_date).toLocaleDateString()} – {new Date(test.end_date).toLocaleDateString()}
+            </span>
+          </div>
 
           <ExportReport abTestId={test._id} onUnauthorized={handleUnauthorized} />
 
-          <ul className="mt-6 flex flex-col gap-4">
-            {test.variants.map((variant) => (
+          <ResultsCharts test={test} predictedIdx={predictedIdx} />
+
+          <h2 className="mt-8 text-lg font-semibold">Variants</h2>
+          <ul className="mt-3 flex flex-col gap-4">
+            {test.variants.map((variant, idx) => (
               <VariantRow
                 key={variant._id}
                 variant={variant}
+                label={variantLabel(idx)}
+                isPredicted={idx === predictedIdx}
                 abTestId={test._id}
                 isWinner={test.winner_variant_id === variant._id}
                 onSaved={load}
