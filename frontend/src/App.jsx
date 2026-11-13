@@ -6,6 +6,8 @@ import CompleteProfilePage from "./pages/CompleteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import OptimizePage from "./pages/OptimizePage";
+import ReportsPage from "./pages/ReportsPage";
+import ThumbnailsPage from "./pages/ThumbnailsPage";
 import UploadPage from "./pages/UploadPage";
 import { getToken } from "./lib/api";
 
@@ -31,6 +33,22 @@ export default function App() {
           element={
             <RequireAuth>
               <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/thumbnails"
+          element={
+            <RequireAuth>
+              <ThumbnailsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <RequireAuth>
+              <ReportsPage />
             </RequireAuth>
           }
         />
