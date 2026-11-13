@@ -13,7 +13,7 @@ function todayISO(offsetDays = 0) {
 function ScoreBadge({ score, rank }) {
   return (
     <div className="absolute left-2 top-2 flex items-center gap-1.5">
-      <span className="rounded-full bg-background/90 px-2 py-0.5 font-mono text-xs font-semibold tabular-nums">
+      <span className="rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs font-semibold tabular-nums">
         {score.toFixed(1)}
       </span>
       {rank === 1 && (
@@ -185,7 +185,7 @@ export default function OptimizePage() {
                     />
                   </div>
                   <ScoreBadge score={item.ctr_score} rank={item.rank} />
-                  <span className="absolute bottom-2 right-2 rounded-full bg-background/90 px-2 py-0.5 font-mono text-xs">
+                  <span className="absolute bottom-2 right-2 rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs">
                     #{item.rank}
                   </span>
                 </button>

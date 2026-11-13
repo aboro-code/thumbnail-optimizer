@@ -154,19 +154,31 @@ export default function UploadPage() {
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {candidates.map((c, i) => (
               <li key={c.previewUrl} className="relative overflow-hidden rounded-lg border border-border bg-card">
-                <div className="aspect-video w-full bg-muted">
+                <div className="relative aspect-video w-full bg-muted">
                   <img src={c.previewUrl} alt={`Preview of ${c.file.name}`} className="h-full w-full object-cover" />
+                  {stage !== "" && (
+                    // Loading state while the image is uploaded and scored (PRD §3.3)
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--background)_70%,transparent)] motion-safe:animate-pulse"
+                    >
+                      <span className="rounded-full bg-card px-2 py-0.5 text-xs font-medium text-foreground">
+                        {stage === "uploading" ? "Uploading…" : "Scoring…"}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={() => removeCandidate(i)}
+                  disabled={stage !== ""}
                   aria-label={`Remove ${c.file.name}`}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground hover:bg-destructive hover:text-destructive-foreground"
+                  className="absolute right-1.5 top-1.5 z-10 rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 text-xs font-medium text-foreground hover:bg-destructive hover:text-destructive-foreground disabled:hidden"
                 >
                   ✕
                 </button>
                 {c.problem && (
-                  <p className="border-t border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                  <p className="border-t border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] px-2 py-1 text-xs text-destructive">
                     {c.problem}
                   </p>
                 )}
