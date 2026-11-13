@@ -434,6 +434,26 @@ describe("GET /api/v1/abtests/:id", () => {
     expect(res.body.variants[0].thumbnail_id.image_url).toBe("/uploads/a.jpg");
   });
 
+  it("includes each variant's latest predicted score, null if unscored", async () => {
+    const owner = new mongoose.Types.ObjectId().toString();
+    const a = await createThumbnail(owner);
+    const b = await createThumbnail(owner);
+    await Prediction.create({ thumbnail_id: a._id, ctr_score: 81.4 });
+    const test = await ABTest.create({
+      created_by: owner,
+      content_reference: "ref",
+      start_date: new Date(),
+      end_date: new Date(Date.now() + 86400000),
+      variants: [{ thumbnail_id: a._id }, { thumbnail_id: b._id }],
+    });
+
+    const res = await request(app)
+      .get(`/api/v1/abtests/${test._id}`)
+      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+
+    expect(res.body.variants.map((v) => v.predicted_ctr_score)).toEqual([81.4, null]);
+  });
+
   it("blocks a different Creator from viewing someone else's test", async () => {
     const owner = new mongoose.Types.ObjectId().toString();
     const a = await createThumbnail(owner);

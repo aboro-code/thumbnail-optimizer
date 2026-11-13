@@ -12,6 +12,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
 const Thumbnail = require("../src/models/Thumbnail");
+const Prediction = require("../src/models/Prediction");
 
 let mongod;
 
@@ -161,6 +162,22 @@ describe("GET /api/v1/thumbnails", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.thumbnails).toHaveLength(2);
+  });
+
+  it("includes each thumbnail's latest score, or null if never scored", async () => {
+    const owner = new mongoose.Types.ObjectId().toString();
+    const scored = await Thumbnail.create({ user_id: owner, image_url: "/uploads/a.jpg" });
+    await Thumbnail.create({ user_id: owner, image_url: "/uploads/b.jpg" });
+    await Prediction.create({ thumbnail_id: scored._id, ctr_score: 40, scored_at: new Date("2026-11-01") });
+    await Prediction.create({ thumbnail_id: scored._id, ctr_score: 72.5, scored_at: new Date("2026-11-02") });
+
+    const res = await request(app)
+      .get("/api/v1/thumbnails")
+      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+
+    const byId = Object.fromEntries(res.body.thumbnails.map((t) => [t._id, t.latest_ctr_score]));
+    expect(byId[scored._id.toString()]).toBe(72.5);
+    expect(Object.values(byId)).toContain(null);
   });
 
   it("filters by status", async () => {

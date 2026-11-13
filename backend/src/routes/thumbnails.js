@@ -10,6 +10,7 @@ const { upload, ALLOWED_MIME_TYPES, EXTENSION_BY_MIME } = require("../middleware
 const { detectImageMime } = require("../utils/imageSignature");
 const { UPLOAD_DIR } = require("../config/uploadDir");
 const Thumbnail = require("../models/Thumbnail");
+const { latestScoresByThumbnail } = require("../services/predictionLookup");
 
 const router = express.Router();
 
@@ -105,7 +106,13 @@ router.get("/", requireAuth, async (req, res) => {
 
   try {
     const thumbnails = await Thumbnail.find(filter).sort({ uploaded_at: -1 });
-    res.json({ thumbnails });
+    const scores = await latestScoresByThumbnail(thumbnails.map((t) => t._id));
+    res.json({
+      thumbnails: thumbnails.map((t) => ({
+        ...t.toObject(),
+        latest_ctr_score: scores.get(t._id.toString()) ?? null,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch thumbnails" });
   }

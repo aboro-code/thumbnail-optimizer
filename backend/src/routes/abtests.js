@@ -8,6 +8,7 @@ const {
   latestPredictions,
   predictionMatchedWinner: predictionMatched,
 } = require("../services/abtestReport");
+const { latestScoresByThumbnail } = require("../services/predictionLookup");
 
 const router = express.Router();
 
@@ -121,7 +122,15 @@ router.get("/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
-  res.json(test);
+  // Each variant also carries its latest predicted score, for the predicted-vs-actual chart.
+  const body = test.toObject();
+  const scores = await latestScoresByThumbnail(body.variants.map((v) => v.thumbnail_id?._id ?? v.thumbnail_id));
+  body.variants = body.variants.map((v) => ({
+    ...v,
+    predicted_ctr_score: scores.get(String(v.thumbnail_id?._id ?? v.thumbnail_id)) ?? null,
+  }));
+
+  res.json(body);
 });
 
 // PATCH /api/v1/abtests/:id/variants/:variantId/metrics
