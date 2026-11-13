@@ -233,6 +233,59 @@ describe("report export access", () => {
   });
 });
 
+describe("GET /api/v1/reports (export history)", () => {
+  it("logs each export and lists the user's own history, newest first", async () => {
+    const ownerId = new mongoose.Types.ObjectId().toString();
+    const test = await createScoredTest(ownerId);
+    const token = tokenFor("Creator", ownerId);
+
+    await request(app).get(`/api/v1/reports/${test._id}/export?format=csv`).set("Authorization", `Bearer ${token}`);
+    await request(app)
+      .get(`/api/v1/reports/${test._id}/export?format=pdf`)
+      .set("Authorization", `Bearer ${token}`)
+      .buffer(true)
+      .parse(binaryParser);
+
+    const res = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.reports.map((r) => r.format)).toEqual(["pdf", "csv"]);
+    expect(res.body.reports[0].ab_test).toMatchObject({
+      _id: test._id.toString(),
+      content_reference: "youtube.com/watch?v=abc123",
+      status: "COMPLETED",
+    });
+  });
+
+  it("does not log a rejected export", async () => {
+    const ownerId = new mongoose.Types.ObjectId().toString();
+    const test = await createScoredTest(ownerId);
+
+    await request(app)
+      .get(`/api/v1/reports/${test._id}/export?format=csv`)
+      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+
+    const res = await request(app)
+      .get("/api/v1/reports")
+      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+    expect(res.body.reports).toHaveLength(0);
+  });
+
+  it("hides other users' exports from a Creator but shows them to a Manager", async () => {
+    const ownerId = new mongoose.Types.ObjectId().toString();
+    const test = await createScoredTest(ownerId);
+    await request(app)
+      .get(`/api/v1/reports/${test._id}/export?format=csv`)
+      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+
+    const other = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Creator")}`);
+    const manager = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Manager")}`);
+
+    expect(other.body.reports).toHaveLength(0);
+    expect(manager.body.reports).toHaveLength(1);
+  });
+});
+
 describe("csvCell", () => {
   it("quotes commas, quotes and newlines", () => {
     expect(csvCell('a, "b"\nc')).toBe('"a, ""b""\nc"');
