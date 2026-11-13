@@ -59,14 +59,27 @@ describe("POST /api/v1/thumbnails/upload", () => {
       .attach("files", JPEG_BUFFER, { filename: "a.jpg", contentType: "image/jpeg" })
       .attach("files", PNG_BUFFER, { filename: "b.png", contentType: "image/png" });
 
-    expect(res.status).toBe(202);
-    expect(res.body.status).toBe("PROCESSING");
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe("UPLOADED");
     expect(res.body.thumbnail_ids).toHaveLength(2);
 
     const saved = await Thumbnail.find({});
     expect(saved).toHaveLength(2);
     expect(saved[0].content_title).toBe("My Video");
     expect(saved[0].status).toBe("UPLOADED");
+  });
+
+  it("serves uploaded images from the configured UPLOAD_DIR", async () => {
+    await request(app)
+      .post("/api/v1/thumbnails/upload")
+      .set("Authorization", `Bearer ${creatorToken()}`)
+      .attach("files", JPEG_BUFFER, { filename: "a.jpg", contentType: "image/jpeg" })
+      .attach("files", PNG_BUFFER, { filename: "b.png", contentType: "image/png" });
+
+    const [saved] = await Thumbnail.find({});
+    const res = await request(app).get(saved.image_url);
+
+    expect(res.status).toBe(200);
   });
 
   it("rejects a batch with fewer than 2 files", async () => {

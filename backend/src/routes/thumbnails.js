@@ -79,10 +79,12 @@ router.post(
         })
       );
 
-      res.status(202).json({
+      // Scoring is not queued here: the caller scores the batch with
+      // POST /predictions/analyze, so the thumbnails are simply UPLOADED.
+      res.status(201).json({
         thumbnail_ids: thumbnails.map((t) => t._id),
-        status: "PROCESSING",
-        message: "Thumbnails uploaded successfully. Scoring job queued.",
+        status: "UPLOADED",
+        message: "Thumbnails uploaded. Score them with POST /api/v1/predictions/analyze.",
       });
     } catch (err) {
       res.status(500).json({ message: "Failed to store uploaded thumbnails" });

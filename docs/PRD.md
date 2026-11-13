@@ -419,14 +419,15 @@ erDiagram
 * **Endpoint:** `POST /api/v1/thumbnails/upload`
 * **Authorization:** Bearer JWT (Roles: `Creator`, `Manager`, `Admin`)
 * **Request:** `multipart/form-data` with one or more `files: UploadFile[]`
-* **Response (202 Accepted):**
+* **Response (201 Created):**
 ```json
 {
   "thumbnail_ids": ["665f1a2b3c4d5e6f7a8b9c01", "665f1a2b3c4d5e6f7a8b9c02"],
-  "status": "PROCESSING",
-  "message": "Thumbnails uploaded successfully. Scoring job queued."
+  "status": "UPLOADED",
+  "message": "Thumbnails uploaded. Score them with POST /api/v1/predictions/analyze."
 }
 ```
+* **Note:** scoring is not queued on upload. The client scores the batch synchronously with §7.2, which returns the ranked results directly (an earlier draft of this spec described a 202 + background job that was not built).
 
 ### 7.2 Trigger CTR Prediction
 * **Endpoint:** `POST /api/v1/predictions/analyze`
