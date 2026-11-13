@@ -10,6 +10,7 @@ const thumbnailRoutes = require("./routes/thumbnails");
 const predictionRoutes = require("./routes/predictions");
 const abtestRoutes = require("./routes/abtests");
 const reportRoutes = require("./routes/reports");
+const dashboardRoutes = require("./routes/dashboard");
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/v1/thumbnails", thumbnailRoutes);
 app.use("/api/v1/predictions", predictionRoutes);
 app.use("/api/v1/abtests", abtestRoutes);
 app.use("/api/v1/reports", reportRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
 
 const PORT = process.env.PORT || 5000;
 
