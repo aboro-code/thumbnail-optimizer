@@ -121,6 +121,8 @@ All routes are under `/api/v1` and, apart from signup/login/Google, need `Author
 | PATCH | `/abtests/:id/variants/:variantId/metrics` | Record impressions and clicks |
 | PATCH | `/abtests/:id/status` | Close a test and declare the winner (Manager/Admin) |
 | GET | `/reports/:abTestId/export?format=pdf\|csv` | Download an A/B test report (thumbnails, predictions, results) |
+| GET | `/reports` | History of exported reports |
+| GET | `/dashboard/summary` | Dashboard metrics: scored count, active tests, avg. predicted lift, AI accuracy, reports, score distribution |
 
 ## Tests
 ```bash
@@ -130,4 +132,4 @@ cd frontend && npm run build
 ```
 
 ## Project Status
-Weeks 1–6 of the roadmap (`docs/PRD.md` §13.2) are complete, plus the model-training pipeline. Week 7 is in progress: PDF/CSV export, the accessibility pass (WCAG AA contrast, keyboard focus, screen-reader labels) and UI fixes are done. Docker Compose deployment is planned for Week 8 and isn't working yet.
+Weeks 1–6 of the roadmap (`docs/PRD.md` §13.2) are complete, plus the model-training pipeline. Week 7 is done: PDF/CSV export with a report history, the full PRD §3.1 page set (dashboard metrics, thumbnails, A/B tests, reports), predicted-vs-actual charts, loading skeletons, and an accessibility pass (WCAG AA contrast, keyboard focus, screen-reader labels). Next is Week 8: deployment, model card and demo prep. Docker Compose deployment is planned for Week 8 and isn't working yet.
