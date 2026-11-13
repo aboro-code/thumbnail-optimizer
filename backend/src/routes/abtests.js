@@ -3,8 +3,11 @@ const mongoose = require("mongoose");
 
 const { requireAuth, requireRole } = require("../middleware/auth");
 const Thumbnail = require("../models/Thumbnail");
-const Prediction = require("../models/Prediction");
 const ABTest = require("../models/ABTest");
+const {
+  latestPredictions,
+  predictionMatchedWinner: predictionMatched,
+} = require("../services/abtestReport");
 
 const router = express.Router();
 
@@ -211,20 +214,8 @@ router.patch("/:id/status", requireAuth, requireRole("Manager", "Admin"), async 
     if (winnerVariant) {
       updateFields.winner_variant_id = winnerVariant._id;
 
-      const predictions = await Promise.all(
-        current.variants.map((v) =>
-          Prediction.findOne({ thumbnail_id: v.thumbnail_id }).sort({ scored_at: -1 })
-        )
-      );
-
-      if (predictions.every((p) => p !== null)) {
-        const predictedWinnerIndex = predictions.reduce(
-          (bestIdx, p, idx) => (p.ctr_score > predictions[bestIdx].ctr_score ? idx : bestIdx),
-          0
-        );
-        const predictedWinnerThumbnailId = current.variants[predictedWinnerIndex].thumbnail_id.toString();
-        predictionMatchedWinner = predictedWinnerThumbnailId === winnerVariant.thumbnail_id.toString();
-      }
+      const predictions = await latestPredictions(current.variants);
+      predictionMatchedWinner = predictionMatched(current.variants, predictions, winnerVariant._id);
     }
   }
 

@@ -37,7 +37,7 @@ function VariantRow({ variant, abTestId, isWinner, onSaved, onUnauthorized }) {
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="aspect-video w-full flex-shrink-0 overflow-hidden rounded-md bg-muted sm:w-32">
           {thumb?.image_url && (
-            <img src={`${API_URL}${thumb.image_url}`} alt="" className="h-full w-full object-cover" />
+            <img src={`${API_URL}${thumb.image_url}`} alt={thumb.content_title || "Variant thumbnail"} className="h-full w-full object-cover" />
           )}
         </div>
         <div className="flex flex-1 flex-col gap-2">
@@ -139,6 +139,55 @@ function CloseTestPanel({ abTestId, onClosed, onUnauthorized }) {
   );
 }
 
+function ExportReport({ abTestId, onUnauthorized }) {
+  const [downloading, setDownloading] = useState(null);
+  const [error, setError] = useState("");
+
+  // The export needs the JWT header, so it's fetched as a blob rather than a plain link.
+  async function download(format) {
+    setError("");
+    setDownloading(format);
+    try {
+      const res = await api.get(`/reports/${abTestId}/export`, {
+        params: { format },
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `abtest-${abTestId}.${format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        onUnauthorized();
+        return;
+      }
+      setError(`Could not export the ${format.toUpperCase()} report.`);
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Export report">
+      <span className="text-xs text-muted-foreground">Export report:</span>
+      {["pdf", "csv"].map((format) => (
+        <button
+          key={format}
+          type="button"
+          onClick={() => download(format)}
+          disabled={downloading !== null}
+          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+        >
+          {downloading === format ? "Preparing…" : format.toUpperCase()}
+        </button>
+      ))}
+      {error && <p role="alert" className="w-full text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
 export default function ABTestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -196,7 +245,7 @@ export default function ABTestDetailPage() {
         </p>
       )}
 
-      {!error && !test && <p className="mt-8 text-sm text-muted-foreground">Loading…</p>}
+      {!error && !test && <p role="status" className="mt-8 text-sm text-muted-foreground">Loading…</p>}
 
       {test && (
         <>
@@ -204,6 +253,8 @@ export default function ABTestDetailPage() {
             {test.status} · {new Date(test.start_date).toLocaleDateString()} –{" "}
             {new Date(test.end_date).toLocaleDateString()}
           </p>
+
+          <ExportReport abTestId={test._id} onUnauthorized={handleUnauthorized} />
 
           <ul className="mt-6 flex flex-col gap-4">
             {test.variants.map((variant) => (
@@ -219,7 +270,7 @@ export default function ABTestDetailPage() {
           </ul>
 
           {closeResult && (
-            <div className="mt-6 rounded-lg border border-chart-4 bg-card p-4 text-sm">
+            <div role="status" className="mt-6 rounded-lg border border-chart-4 bg-card p-4 text-sm">
               <p className="font-medium text-chart-4">Test {closeResult.status.toLowerCase()}</p>
               {closeResult.status === "COMPLETED" && (
                 <p className="mt-1 text-muted-foreground">
