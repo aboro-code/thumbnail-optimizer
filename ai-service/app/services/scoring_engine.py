@@ -29,8 +29,7 @@ class HeuristicCVScoringStrategy(CTRScoringStrategy):
 
 def derive_explanation_signals(features: dict) -> list:
     """Plain-language labels for the raw CV features, so a score is never
-    returned bare (BR-002). A placeholder for the LLM-grounded RAG
-    explainer planned for Week 5-6 - simple thresholds, not a model."""
+    returned bare (BR-002)."""
     signals = []
 
     if features["contrast"] >= 60:

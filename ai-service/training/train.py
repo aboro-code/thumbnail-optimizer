@@ -69,8 +69,9 @@ def fit(pairs: list, l2: float = L2_STRENGTH, iterations: int = 50) -> dict:
     w = np.zeros(len(FEATURES))
     for _ in range(iterations):
         prob = 1.0 / (1.0 + np.exp(-diffs @ w))
-        gradient = diffs.T @ (totals * prob - wins) + l2 * w
+        gradient = diffs.T @ (totals * prob - wins) + l2 * w  # (totals * prob - wins) is error vector
         hessian = diffs.T @ (diffs * (totals * prob * (1 - prob))[:, None]) + l2 * np.eye(len(w))
+        # prob * (1 - prob) is the slope of the sigmoid, [:, None] reshapes to (n, 1) so it multiplies each row of diffs
         step = np.linalg.solve(hessian, gradient)
         w -= step
         if np.abs(step).max() < 1e-10:
