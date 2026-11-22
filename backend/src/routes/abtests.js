@@ -10,15 +10,13 @@ const {
 } = require("../services/abtestReport");
 const { latestScoresByThumbnail } = require("../services/predictionLookup");
 
+const { ownerFilter, canAccessOwner, canAccessAllOwners } = require("../services/access");
+
 const router = express.Router();
 
-const PRIVILEGED_ROLES = ["Manager", "Admin"];
 const MIN_VARIANTS = 2;
 const STATUSES = ["RUNNING", "COMPLETED", "CANCELLED"];
 
-function isOwnerOrPrivileged(req, ownerId) {
-  return PRIVILEGED_ROLES.includes(req.user.role) || ownerId.toString() === req.user.sub;
-}
 
 // POST /api/v1/abtests
 router.post("/", requireAuth, requireRole("Creator", "Manager", "Admin"), async (req, res) => {
@@ -47,9 +45,7 @@ router.post("/", requireAuth, requireRole("Creator", "Manager", "Admin"), async 
     return res.status(404).json({ message: "One or more thumbnails were not found" });
   }
 
-  const isPrivileged = PRIVILEGED_ROLES.includes(req.user.role);
-  const unauthorized = thumbnails.some((t) => !isPrivileged && t.user_id.toString() !== req.user.sub);
-  if (unauthorized) {
+  if (!(await canAccessAllOwners(req.user, thumbnails.map((t) => t.user_id)))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
@@ -83,7 +79,7 @@ router.get("/", requireAuth, async (req, res) => {
     return res.status(400).json({ message: `status must be one of ${STATUSES.join(", ")}` });
   }
 
-  const filter = PRIVILEGED_ROLES.includes(req.user.role) ? {} : { created_by: req.user.sub };
+  const filter = await ownerFilter(req.user, "created_by");
   if (status) filter.status = status;
 
   const tests = await ABTest.find(filter).sort({ createdAt: -1 });
@@ -118,7 +114,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   if (!test) {
     return res.status(404).json({ message: "A/B test not found" });
   }
-  if (!isOwnerOrPrivileged(req, test.created_by)) {
+  if (!(await canAccessOwner(req.user, test.created_by))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
@@ -163,7 +159,7 @@ router.patch(
     if (!abTest) {
       return res.status(404).json({ message: "A/B test not found" });
     }
-    if (!isOwnerOrPrivileged(req, abTest.created_by)) {
+    if (!(await canAccessOwner(req.user, abTest.created_by))) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
 
@@ -206,6 +202,10 @@ router.patch("/:id/status", requireAuth, requireRole("Manager", "Admin"), async 
   }
   if (!current) {
     return res.status(404).json({ message: "A/B test not found" });
+  }
+  // A Manager can only close tests from their own team.
+  if (!(await canAccessOwner(req.user, current.created_by))) {
+    return res.status(403).json({ message: "Insufficient permissions" });
   }
 
   // Guard the transition on the test still being RUNNING, so two concurrent

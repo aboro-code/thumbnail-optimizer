@@ -10,9 +10,10 @@ const { UPLOAD_DIR } = require("../config/uploadDir");
 const Thumbnail = require("../models/Thumbnail");
 const Prediction = require("../models/Prediction");
 
+const { canAccessAllOwners } = require("../services/access");
+
 const router = express.Router();
 
-const PRIVILEGED_ROLES = ["Manager", "Admin"];
 
 async function scoreOneThumbnail(thumbnail) {
   const aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
@@ -58,9 +59,7 @@ router.post("/analyze", requireAuth, async (req, res) => {
     return res.status(404).json({ message: "One or more thumbnails were not found" });
   }
 
-  const isPrivileged = PRIVILEGED_ROLES.includes(req.user.role);
-  const unauthorized = thumbnails.some((t) => !isPrivileged && t.user_id.toString() !== req.user.sub);
-  if (unauthorized) {
+  if (!(await canAccessAllOwners(req.user, thumbnails.map((t) => t.user_id)))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 

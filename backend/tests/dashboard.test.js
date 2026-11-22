@@ -102,12 +102,12 @@ describe("GET /api/v1/dashboard/summary", () => {
     expect(counts).toMatchObject({ 50: 1, 60: 1, 70: 1, 90: 1, 10: 0 });
   });
 
-  it("includes everyone's data for a Manager", async () => {
+  it("includes everyone's data for an Admin", async () => {
     await seed();
 
     const res = await request(app)
       .get("/api/v1/dashboard/summary")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(res.body.thumbnails_total).toBe(6);
     expect(res.body.reports_generated).toBe(3);

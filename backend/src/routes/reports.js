@@ -6,9 +6,10 @@ const ReportExport = require("../models/ReportExport");
 const { buildReport } = require("../services/abtestReport");
 const { toCsv, toPdf } = require("../services/reportExport");
 
+const { ownerFilter, canAccessOwner } = require("../services/access");
+
 const router = express.Router();
 
-const PRIVILEGED_ROLES = ["Manager", "Admin"];
 const FORMATS = ["csv", "pdf"];
 const HISTORY_LIMIT = 100;
 
@@ -28,7 +29,7 @@ router.get("/:abTestId/export", requireAuth, async (req, res) => {
   if (!test) {
     return res.status(404).json({ message: "A/B test not found" });
   }
-  if (!PRIVILEGED_ROLES.includes(req.user.role) && test.created_by.toString() !== req.user.sub) {
+  if (!(await canAccessOwner(req.user, test.created_by))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
@@ -45,9 +46,9 @@ router.get("/:abTestId/export", requireAuth, async (req, res) => {
 });
 
 // GET /api/v1/reports  (PRD §3.1 /reports: history of exported reports)
-// Creators see their own exports; Managers/Admins see everyone's.
+// Creators see their own exports; Managers their team's; Admins everyone's.
 router.get("/", requireAuth, async (req, res) => {
-  const filter = PRIVILEGED_ROLES.includes(req.user.role) ? {} : { user_id: req.user.sub };
+  const filter = await ownerFilter(req.user);
   const exports = await ReportExport.find(filter)
     .sort({ created_at: -1 })
     .limit(HISTORY_LIMIT)

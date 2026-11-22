@@ -218,7 +218,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.status).toBe(200);
@@ -238,7 +238,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBe(true);
@@ -253,7 +253,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBe(false);
@@ -265,7 +265,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBeNull();
@@ -277,13 +277,13 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const first = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
     expect(first.status).toBe(200);
 
     const second = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(second.status).toBe(409);
@@ -295,7 +295,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "RUNNING" });
 
     expect(res.status).toBe(400);
@@ -304,7 +304,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
   it("returns 404 for an unknown test id", async () => {
     const res = await request(app)
       .patch(`/api/v1/abtests/${new mongoose.Types.ObjectId()}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.status).toBe(404);
@@ -344,7 +344,7 @@ describe("GET /api/v1/abtests", () => {
     expect(res.body.ab_tests[0].variant_count).toBe(2);
   });
 
-  it("lets a Manager see tests from every user", async () => {
+  it("lets an Admin see tests from every user", async () => {
     const ownerA = new mongoose.Types.ObjectId().toString();
     const ownerB = new mongoose.Types.ObjectId().toString();
     const a1 = await createThumbnail(ownerA);
@@ -368,7 +368,7 @@ describe("GET /api/v1/abtests", () => {
 
     const res = await request(app)
       .get("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
     expect(res.body.ab_tests).toHaveLength(2);

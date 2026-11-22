@@ -142,13 +142,13 @@ describe("POST /api/v1/predictions/analyze", () => {
     expect(res.status).toBe(403);
   });
 
-  it("lets a Manager score another user's thumbnail", async () => {
+  it("lets an Admin score another user's thumbnail", async () => {
     const owner = new mongoose.Types.ObjectId().toString();
     const thumb = await createThumbnail(owner, { contentTitle: "score:60" });
 
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`)
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
       .send({ thumbnail_ids: [thumb._id.toString()] });
 
     expect(res.status).toBe(200);

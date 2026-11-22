@@ -209,12 +209,12 @@ describe("report export access", () => {
     expect(res.status).toBe(403);
   });
 
-  it("lets a Manager export any test", async () => {
+  it("lets an Admin export any test", async () => {
     const test = await createScoredTest(new mongoose.Types.ObjectId().toString());
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
   });
@@ -271,7 +271,7 @@ describe("GET /api/v1/reports (export history)", () => {
     expect(res.body.reports).toHaveLength(0);
   });
 
-  it("hides other users' exports from a Creator but shows them to a Manager", async () => {
+  it("hides other users' exports from a Creator but shows them to an Admin", async () => {
     const ownerId = new mongoose.Types.ObjectId().toString();
     const test = await createScoredTest(ownerId);
     await request(app)
@@ -279,7 +279,7 @@ describe("GET /api/v1/reports (export history)", () => {
       .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
 
     const other = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Creator")}`);
-    const manager = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Manager")}`);
+    const manager = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(other.body.reports).toHaveLength(0);
     expect(manager.body.reports).toHaveLength(1);

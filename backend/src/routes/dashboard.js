@@ -7,9 +7,10 @@ const ReportExport = require("../models/ReportExport");
 const { latestScoresByThumbnail } = require("../services/predictionLookup");
 const { predictedWinnerIndex, predictionMatchedWinner } = require("../services/abtestReport");
 
+const { ownerFilter } = require("../services/access");
+
 const router = express.Router();
 
-const PRIVILEGED_ROLES = ["Manager", "Admin"];
 const SCORE_BINS = 10; // 0-10, 10-20, ... 90-100
 
 function round1(value) {
@@ -18,14 +19,14 @@ function round1(value) {
 
 // GET /api/v1/dashboard/summary
 // The PRD §3.1 dashboard metrics, computed server-side so the page needs one request.
-// Scoped like every other list: Creators see their own data, Managers/Admins see all.
+// Scoped like every other list: Creators see their own data, Managers their team's, Admins all.
 router.get("/summary", requireAuth, async (req, res) => {
-  const privileged = PRIVILEGED_ROLES.includes(req.user.role);
+  const [byUser, byCreator] = await Promise.all([ownerFilter(req.user), ownerFilter(req.user, "created_by")]);
 
   const [thumbnails, tests, reportsGenerated] = await Promise.all([
-    Thumbnail.find(privileged ? {} : { user_id: req.user.sub }).select("_id"),
-    ABTest.find(privileged ? {} : { created_by: req.user.sub }),
-    ReportExport.countDocuments(privileged ? {} : { user_id: req.user.sub }),
+    Thumbnail.find(byUser).select("_id"),
+    ABTest.find(byCreator),
+    ReportExport.countDocuments(byUser),
   ]);
 
   const ids = [...thumbnails.map((t) => t._id), ...tests.flatMap((t) => t.variants.map((v) => v.thumbnail_id))];
@@ -76,6 +77,7 @@ router.get("/summary", requireAuth, async (req, res) => {
     prediction_accuracy: { correct, total: checked },
     reports_generated: reportsGenerated,
     score_distribution: distribution,
+    scope: req.user.role === "Admin" ? "all" : req.user.role === "Manager" ? "team" : "own",
   });
 });
 
