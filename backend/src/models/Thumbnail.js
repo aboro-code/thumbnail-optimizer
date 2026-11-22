@@ -11,6 +11,9 @@ const thumbnailSchema = new mongoose.Schema({
     default: "UPLOADED",
   },
   uploaded_at: { type: Date, default: Date.now },
+  // Every thumbnail uploaded together shares a batch id, so a batch can be
+  // reopened on the Optimize page later (/thumbnails/:id/optimize).
+  batch_id: { type: String, index: true },
 });
 
 thumbnailSchema.index({ user_id: 1 });

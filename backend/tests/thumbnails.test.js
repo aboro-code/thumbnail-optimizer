@@ -150,7 +150,7 @@ describe("GET /api/v1/thumbnails", () => {
     expect(res.body.thumbnails[0].user_id).toBe(ownerA);
   });
 
-  it("lets a Manager see thumbnails from every user", async () => {
+  it("lets an Admin see thumbnails from every user", async () => {
     const ownerA = new mongoose.Types.ObjectId().toString();
     const ownerB = new mongoose.Types.ObjectId().toString();
     await Thumbnail.create({ user_id: ownerA, image_url: "/uploads/a.jpg" });
@@ -158,7 +158,7 @@ describe("GET /api/v1/thumbnails", () => {
 
     const res = await request(app)
       .get("/api/v1/thumbnails")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
     expect(res.body.thumbnails).toHaveLength(2);
@@ -227,13 +227,13 @@ describe("GET /api/v1/thumbnails/:id", () => {
     expect(res.status).toBe(403);
   });
 
-  it("lets a Manager fetch any thumbnail", async () => {
+  it("lets an Admin fetch any thumbnail", async () => {
     const owner = new mongoose.Types.ObjectId().toString();
     const thumb = await Thumbnail.create({ user_id: owner, image_url: "/uploads/a.jpg" });
 
     const res = await request(app)
       .get(`/api/v1/thumbnails/${thumb._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
   });
