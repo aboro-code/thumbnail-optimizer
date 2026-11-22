@@ -36,8 +36,8 @@ The local LLM needs memory, so free "web app" tiers such as Render or Vercel can
 
 | Option | Cost | Notes |
 |---|---|---|
-| Oracle Cloud "Always Free" Ampere A1 | Free | Up to 4 ARM cores / 24 GB RAM. All images used here have ARM64 builds. See the firewall note in step 2.2. |
-| Azure for Students | $100 credit | A `B2s` (4 GB) works; `B2ms` (8 GB) is smoother. |
+| Azure for Students | $100 credit, no card | **Recommended.** A `B2ms` (8 GB, about $60/month) or `B2s` (4 GB, about $30/month). Stop the VM when not in use to save credit. |
+| Oracle Cloud "Always Free" Ampere A1 | Free (card needed to sign up) | Capped at 2 ARM cores / 12 GB RAM since mid-2026, and A1 capacity is often unavailable ("out of host capacity"). All images used here have ARM64 builds. See the firewall note in step 2.2. |
 | AWS / GCP credits | Credits | `t3.large` / `e2-standard-2` or bigger. |
 
 In the provider's network settings, open inbound ports **22** (SSH), **80** and **443**.
