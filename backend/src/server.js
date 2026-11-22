@@ -11,6 +11,8 @@ const predictionRoutes = require("./routes/predictions");
 const abtestRoutes = require("./routes/abtests");
 const reportRoutes = require("./routes/reports");
 const dashboardRoutes = require("./routes/dashboard");
+const teamRoutes = require("./routes/team");
+const adminRoutes = require("./routes/admin");
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/v1/predictions", predictionRoutes);
 app.use("/api/v1/abtests", abtestRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/team", teamRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 const PORT = process.env.PORT || 5000;
 
