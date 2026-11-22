@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { api, API_URL, clearToken, clearUser, getOptimizeSession, setOptimizeSession } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
+import { CardGridSkeleton } from "../components/Skeleton";
+
+function hasScore(item) {
+  return item.ctr_score !== null && item.ctr_score !== undefined;
+}
 
 function todayISO(offsetDays = 0) {
   const d = new Date();
@@ -14,7 +19,7 @@ function ScoreBadge({ score, rank }) {
   return (
     <div className="absolute left-2 top-2 flex items-center gap-1.5">
       <span className="rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs font-semibold tabular-nums">
-        {score.toFixed(1)}
+        {score === null ? "Not scored" : score.toFixed(1)}
       </span>
       {rank === 1 && (
         <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
@@ -109,9 +114,16 @@ function StartTestForm({ items, onCreated, onUnauthorized }) {
 export default function OptimizePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  // Fresh results arrive as router state from the upload page; after a refresh
-  // router state is gone, so fall back to the copy saved for this tab.
-  const [session] = useState(() => (location.state?.items ? location.state : getOptimizeSession()));
+  // Two ways in:
+  //  - /thumbnails/optimize: fresh results arrive as router state from the upload
+  //    page; after a refresh that state is gone, so fall back to this tab's copy.
+  //  - /thumbnails/:id/optimize: reopen any earlier batch, loaded from the server.
+  const { id: batchThumbnailId } = useParams();
+  const [session, setSession] = useState(() =>
+    batchThumbnailId ? null : location.state?.items ? location.state : getOptimizeSession()
+  );
+  const [loadError, setLoadError] = useState("");
+  const [scoring, setScoring] = useState(false);
   const items = session?.items;
   const contentTitle = session?.content_title;
 
@@ -119,9 +131,72 @@ export default function OptimizePage() {
   const [showTestForm, setShowTestForm] = useState(false);
   const [createdTest, setCreatedTest] = useState(session?.created_test || null);
 
+  function handleUnauthorized() {
+    clearToken();
+    clearUser();
+    navigate("/login", { replace: true });
+  }
+
+  async function loadBatch() {
+    try {
+      const res = await api.get(`/thumbnails/${batchThumbnailId}/batch`);
+      setSession(res.data);
+      setSelectedId((current) => current || res.data.items[0]?._id);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      setLoadError(err.response?.data?.message || "Could not load this batch. Is the backend running?");
+    }
+  }
+
   useEffect(() => {
-    if (session?.items) setOptimizeSession({ ...session, created_test: createdTest });
-  }, [session, createdTest]);
+    if (batchThumbnailId) loadBatch();
+    // loadBatch only depends on the id
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchThumbnailId]);
+
+  useEffect(() => {
+    if (!batchThumbnailId && session?.items) setOptimizeSession({ ...session, created_test: createdTest });
+  }, [batchThumbnailId, session, createdTest]);
+
+  async function scoreBatch() {
+    setScoring(true);
+    setLoadError("");
+    try {
+      await api.post("/predictions/analyze", { thumbnail_ids: items.map((i) => i._id) });
+      await loadBatch();
+    } catch (err) {
+      if (err.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      setLoadError(err.response?.data?.message || "Scoring failed. Is the AI service running?");
+    } finally {
+      setScoring(false);
+    }
+  }
+
+  if (batchThumbnailId && !session) {
+    return (
+      <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
+        <header className="flex items-center justify-between">
+          <Link to="/thumbnails" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+            ← Thumbnails
+          </Link>
+          <ThemeToggle />
+        </header>
+        {loadError ? (
+          <p role="alert" className="mt-8 text-sm text-destructive">{loadError}</p>
+        ) : (
+          <div className="mt-8">
+            <CardGridSkeleton count={3} label="Loading batch" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!items || items.length === 0) {
     return (
@@ -145,24 +220,42 @@ export default function OptimizePage() {
   }
 
   const selected = items.find((i) => i._id === selectedId) || items[0];
-
-  function handleUnauthorized() {
-    clearToken();
-    clearUser();
-    navigate("/login", { replace: true });
-  }
+  const unscored = items.filter((i) => !hasScore(i)).length;
+  // A batch reopened later may already be in a test; don't offer a duplicate one.
+  const alreadyTested = !createdTest && items.some((i) => i.status === "TESTING" || i.status === "COMPLETED");
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
-            ← Dashboard
+          <Link
+            to={batchThumbnailId ? "/thumbnails" : "/dashboard"}
+            className="font-mono text-xs uppercase tracking-widest text-primary hover:underline"
+          >
+            {batchThumbnailId ? "← Thumbnails" : "← Dashboard"}
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">{contentTitle || "Optimize candidates"}</h1>
         </div>
         <ThemeToggle />
       </header>
+
+      {loadError && <p role="alert" className="mt-6 text-sm text-destructive">{loadError}</p>}
+
+      {unscored > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+          <p className="text-sm">
+            {unscored} of {items.length} {unscored === 1 ? "candidate hasn't" : "candidates haven't"} been scored yet.
+          </p>
+          <button
+            type="button"
+            onClick={scoreBatch}
+            disabled={scoring}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            {scoring ? "Scoring… (about 10 s per image)" : "Score now"}
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
         <section aria-label="Candidate gallery">
@@ -180,14 +273,20 @@ export default function OptimizePage() {
                   <div className="aspect-video w-full bg-muted">
                     <img
                       src={`${API_URL}${item.image_url}`}
-                      alt={`Candidate ranked #${item.rank}, score ${item.ctr_score.toFixed(1)}`}
+                      alt={
+                        hasScore(item)
+                          ? `Candidate ranked #${item.rank}, score ${item.ctr_score.toFixed(1)}`
+                          : "Unscored candidate"
+                      }
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <ScoreBadge score={item.ctr_score} rank={item.rank} />
-                  <span className="absolute bottom-2 right-2 rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs">
-                    #{item.rank}
-                  </span>
+                  <ScoreBadge score={hasScore(item) ? item.ctr_score : null} rank={item.rank} />
+                  {item.rank && (
+                    <span className="absolute bottom-2 right-2 rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs">
+                      #{item.rank}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
@@ -196,8 +295,12 @@ export default function OptimizePage() {
 
         <aside aria-label="Explanation" className="flex flex-col gap-4">
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Rank #{selected.rank} · Score</p>
-            <p className="font-mono text-3xl font-semibold tabular-nums">{selected.ctr_score.toFixed(1)}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {selected.rank ? `Rank #${selected.rank} · Score` : "Score"}
+            </p>
+            <p className="font-mono text-3xl font-semibold tabular-nums">
+              {hasScore(selected) ? selected.ctr_score.toFixed(1) : "—"}
+            </p>
 
             {selected.explanation_signals?.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-1.5">
@@ -225,6 +328,15 @@ export default function OptimizePage() {
                 Go to test →
               </Link>
             </div>
+          ) : alreadyTested ? (
+            <div className="rounded-lg border border-border bg-card p-4 text-sm">
+              <p className="font-medium">Already in an A/B test</p>
+              <Link to="/abtests" className="mt-2 inline-block text-primary hover:underline">
+                See A/B tests →
+              </Link>
+            </div>
+          ) : unscored > 0 ? (
+            <p className="text-sm text-muted-foreground">Score every candidate before starting an A/B test.</p>
           ) : showTestForm ? (
             <StartTestForm items={items} onCreated={setCreatedTest} onUnauthorized={handleUnauthorized} />
           ) : (
