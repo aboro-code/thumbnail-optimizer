@@ -55,11 +55,25 @@ thumbnail-optimizer/
 │   ├── data/                  # survey dataset (raw data is gitignored)
 │   └── tests/
 ├── frontend/src/              # pages/, components/, lib/
-├── docs/PRD.md
-└── docker-compose.yml
+├── docs/                      # PRD.md, DEPLOYMENT.md, MODEL_CARD.md
+├── docker-compose.yml         # full stack: mongo, ollama, ai-service, backend, frontend (nginx)
+└── docker-compose.https.yml   # optional Caddy HTTPS front for a public server
 ```
 
-## Quick Start (local)
+## Roles and teams
+- **Creator:** uploads, scores and tests their own thumbnails. Can join a manager's team with an invite code, at sign-up or on the Team page.
+- **Manager:** sees their own data plus their team's. Shares an invite code and can close A/B tests for the team.
+- **Admin:** sees everything. On the Admin page they manage users (role, team, deactivate), view system analytics, and check the model and LLM status. Admins can't sign up; they are created with `scripts/create-admin.js`.
+
+## Quick Start with Docker (recommended)
+```bash
+cp .env.example .env              # set JWT_SECRET
+docker compose up -d --build      # first run also downloads the Ollama models
+docker compose exec backend node scripts/create-admin.js you@example.com
+```
+Then open http://localhost:8080. To deploy to a cloud VM with HTTPS, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+## Quick Start (without Docker)
 
 **Prerequisites:** Node.js 20.19+, Python 3.10+, MongoDB (e.g. Docker), [Ollama](https://ollama.com).
 
@@ -116,13 +130,19 @@ All routes are under `/api/v1` and, apart from signup/login/Google, need `Author
 | PATCH | `/auth/profile` | Complete a Google user's profile |
 | POST | `/thumbnails/upload` | Upload 2–10 images (validated by file signature) |
 | GET | `/thumbnails`, `/thumbnails/:id` | List / view thumbnails |
+| GET | `/thumbnails/:id/batch` | The batch a thumbnail was uploaded with, ranked by latest score (for reopening it in Optimize) |
 | POST | `/predictions/analyze` | Score and rank a set of thumbnails |
 | POST, GET | `/abtests`, `/abtests/:id` | Create / list / view A/B tests |
 | PATCH | `/abtests/:id/variants/:variantId/metrics` | Record impressions and clicks |
-| PATCH | `/abtests/:id/status` | Close a test and declare the winner (Manager/Admin) |
+| PATCH | `/abtests/:id/status` | Close a test and declare the winner (Manager for their team, Admin) |
 | GET | `/reports/:abTestId/export?format=pdf\|csv` | Download an A/B test report (thumbnails, predictions, results) |
 | GET | `/reports` | History of exported reports |
 | GET | `/dashboard/summary` | Dashboard metrics: scored count, active tests, avg. predicted lift, AI accuracy, reports, score distribution |
+| GET | `/team` | Manager: invite code + members. Creator: their manager |
+| POST | `/team/join`, `/team/leave` | Creator joins (with an invite code) or leaves a team |
+| POST, DELETE | `/team/invite-code`, `/team/members/:id` | Manager: new invite code / remove a member |
+| GET, PATCH | `/admin/users`, `/admin/users/:id` | Admin: list users; change role, manager or active status |
+| GET | `/admin/analytics`, `/admin/model-info` | Admin: system totals; active scoring strategy and Ollama status |
 
 ## Tests
 ```bash
@@ -132,4 +152,10 @@ cd frontend && npm run build
 ```
 
 ## Project Status
-Weeks 1–6 of the roadmap (`docs/PRD.md` §13.2) are complete, plus the model-training pipeline. Week 7 is done: PDF/CSV export with a report history, the full PRD §3.1 page set (dashboard metrics, thumbnails, A/B tests, reports), predicted-vs-actual charts, loading skeletons, and an accessibility pass (WCAG AA contrast, keyboard focus, screen-reader labels). Next is Week 8: deployment, model card and demo prep. Docker Compose deployment is planned for Week 8 and isn't working yet.
+Weeks 1–6 of the roadmap (`docs/PRD.md` §13.2) are complete, plus the model-training pipeline. Week 7 is done: PDF/CSV export with a report history, the full PRD §3.1 page set (dashboard metrics, thumbnails, A/B tests, reports), predicted-vs-actual charts, loading skeletons, and an accessibility pass (WCAG AA contrast, keyboard focus, screen-reader labels). Week 8 adds:
+- the full stack in Docker Compose, plus an HTTPS option for a cloud VM ([`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md));
+- email sign-up;
+- manager–creator teams;
+- the Admin page;
+- reopening any upload batch in Optimize;
+- a [model card](docs/MODEL_CARD.md).

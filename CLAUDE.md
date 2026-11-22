@@ -9,7 +9,7 @@ The full spec — business/product requirements, architecture, database design, 
 
 ## Tech Stack
 - **Frontend (`frontend/`):** React 18 + Vite + React Router + Tailwind CSS v3 + Axios
-- **Backend (`backend/`):** Node.js + Express — auth, REST API, MongoDB access, business logic (JWT auth, Google sign-in, per-user rate limiting, RBAC: Creator/Manager/Admin)
+- **Backend (`backend/`):** Node.js + Express — auth, REST API, MongoDB access, business logic (JWT auth, email sign-up, Google sign-in, per-user rate limiting, RBAC: Creator/Manager/Admin, manager-creator teams)
 - **AI Service (`ai-service/`):** Python + FastAPI — CV feature extraction (OpenCV), CTR scoring strategies, and a RAG explanation pipeline running a **local** LLM through Ollama (`llama3.2:1b` + `nomic-embed-text`). Called internally by the Express backend, never directly by the frontend. Never use a remote/paid LLM API or a model of 10B+ parameters (mentor requirement).
 - **Database:** MongoDB (collections: `users`, `thumbnails`, `predictions`, `abtests`; A/B variants are embedded in each `abtests` document)
 
@@ -18,7 +18,7 @@ The full spec — business/product requirements, architecture, database design, 
 thumbnail-optimizer/
 ├── .github/workflows/     # CI: backend (lint + jest), ai-service (pytest), frontend (build)
 ├── backend/
-│   ├── src/routes/        # auth.js, thumbnails.js, predictions.js, abtests.js
+│   ├── src/routes/        # auth, thumbnails, predictions, abtests, reports, dashboard, team, admin
 │   ├── src/models/        # Mongoose schemas: User.js, Thumbnail.js, Prediction.js, ABTest.js
 │   ├── src/middleware/    # auth.js (JWT, per-user rate limit, RBAC), upload.js
 │   ├── src/config/        # db.js, uploadDir.js
@@ -33,16 +33,17 @@ thumbnail-optimizer/
 │   ├── data/              # survey dataset; raw/, images/, interim/ are gitignored
 │   └── tests/
 ├── frontend/src/          # pages/, components/, lib/
-├── docs/PRD.md            # full project documentation
-└── docker-compose.yml
+├── docs/                  # PRD.md (full spec), DEPLOYMENT.md, MODEL_CARD.md
+├── docker-compose.yml     # full stack incl. ollama; frontend served by nginx on :8080
+└── docker-compose.https.yml  # optional Caddy HTTPS for a public VM
 ```
 
 ## Roadmap (docs/PRD.md §13.2) — work in order
 1. **Week 1–2 (done):** scope, scaffold, JWT auth, core Mongoose/data models, dataset-sourcing decision.
 2. **Week 3–4 (done):** CV feature extraction + `HeuristicCVScoringStrategy` (ai-service), wired to the Express API.
 3. **Week 5–6 (done, plus the model-training pipeline):** A/B testing module, dashboard, RAG explanation engine, evaluation against §2.6/§11.
-4. **Week 7 (current):** Reporting/export (PDF/CSV), UI polish, accessibility pass.
-5. **Week 8:** Final integration, deployment, model card, demo prep.
+4. **Week 7 (done):** Reporting/export (PDF/CSV), UI polish, accessibility pass.
+5. **Week 8 (current, demo video due 2026-11-28):** Final integration, deployment (Docker + cloud VM), model card, demo prep. Also added: email sign-up page, manager-creator teams, admin page, reopening any batch in Optimize.
 
 Don't jump ahead of the current week's scope unless explicitly asked — a mentor is tracking progress against this roadmap.
 
@@ -51,6 +52,7 @@ Don't jump ahead of the current week's scope unless explicitly asked — a mento
 - The AI service is stateless and isolated from the web-facing layer on purpose (ADR-002): CV/LLM logic stays in Python, auth/API/DB stays in Node.
 - Prediction scores must be deterministic — identical input features yield identical output scores.
 - Explanations degrade gracefully: if Ollama is down, scoring still works and the explanation falls back to a template sentence.
+- Data visibility lives in one place, `backend/src/services/access.js`: Admin sees all, a Manager sees themselves plus Creators whose `manager_id` is theirs, a Creator sees only themselves. Use `ownerFilter` / `canAccessOwner` in routes; never hard-code role checks for visibility.
 
 ## Commit Policy
 This is an OJT project and commit history/cadence is monitored by the mentor. Commit **small and often** — at every meaningful checkpoint (a working route, a passing test, a completed model, a config fix), not in large batches at the end of a session.
