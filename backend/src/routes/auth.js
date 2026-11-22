@@ -6,14 +6,17 @@ const rateLimit = require("express-rate-limit");
 const User = require("../models/User");
 const { requireAuth } = require("../middleware/auth");
 const { verifyGoogleCredential } = require("../services/googleAuth");
+const { findManagerByCode } = require("../services/teams");
 
 const router = express.Router();
 
 const PROFILE_ROLES = ["Creator", "Manager"];
 
 function publicUser(user) {
-  return { id: user._id, email: user.email, role: user.role, name: user.name };
+  return { id: user._id, email: user.email, role: user.role, name: user.name, manager_id: user.manager_id || null };
 }
+
+const DEACTIVATED = { message: "This account has been deactivated. Contact an administrator." };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -37,7 +40,7 @@ function signToken(user) {
 
 // POST /api/v1/auth/signup
 router.post("/signup", authLimiter, async (req, res) => {
-  const { email, password, role } = req.body || {};
+  const { email, password, role, name, invite_code } = req.body || {};
 
   if (!email || !EMAIL_RE.test(email)) {
     return res.status(400).json({ message: "A valid email is required" });
@@ -50,6 +53,17 @@ router.post("/signup", authLimiter, async (req, res) => {
   if (role && !PROFILE_ROLES.includes(role)) {
     return res.status(400).json({ message: "Invalid role" });
   }
+  // Optional team code: only Creators join a Manager's team.
+  let manager = null;
+  if (invite_code) {
+    if (role === "Manager") {
+      return res.status(400).json({ message: "Only Creators can join a team" });
+    }
+    manager = await findManagerByCode(invite_code);
+    if (!manager) {
+      return res.status(400).json({ message: "That team code is not valid" });
+    }
+  }
 
   try {
     const existing = await User.findOne({ email: email.toLowerCase() });
@@ -58,13 +72,16 @@ router.post("/signup", authLimiter, async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const user = await User.create({ email, password_hash, role });
+    const user = await User.create({
+      email,
+      password_hash,
+      role,
+      name: typeof name === "string" && name.trim() ? name.trim() : undefined,
+      manager_id: manager ? manager._id : null,
+    });
 
     const token = signToken(user);
-    res.status(201).json({
-      token,
-      user: { id: user._id, email: user.email, role: user.role },
-    });
+    res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ message: "Failed to create account" });
   }
@@ -88,12 +105,12 @@ router.post("/login", authLimiter, async (req, res) => {
     if (!matches) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
+    if (user.active === false) {
+      return res.status(403).json(DEACTIVATED);
+    }
 
     const token = signToken(user);
-    res.json({
-      token,
-      user: { id: user._id, email: user.email, role: user.role },
-    });
+    res.json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ message: "Failed to log in" });
   }
@@ -137,6 +154,9 @@ router.post("/google", authLimiter, async (req, res) => {
       await user.save();
     } else if (user.google_id !== profile.googleId) {
       return res.status(409).json({ message: "This email is linked to a different Google account" });
+    }
+    if (user.active === false) {
+      return res.status(403).json(DEACTIVATED);
     }
 
     res.json({
