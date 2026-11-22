@@ -1,37 +1,76 @@
+# Full stack: docker compose up -d --build   ->   http://localhost:8080
+# First run downloads the Ollama models (~1.6 GB) via the ollama-pull service.
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  backend:
-    build: ./backend
+  ollama:
+    image: ollama/ollama:0.12.6
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # One-shot: pulls the local models into the shared volume, then exits.
+  ollama-pull:
+    image: ollama/ollama:0.12.6
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/thumbnail_optimizer
-      - AI_SERVICE_URL=http://ai-service:8000
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: ["sh", "-c", "sleep 3 && ollama pull ${OLLAMA_MODEL:-llama3.2:1b} && ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text}"]
     depends_on:
-      - mongo
-      - ai-service
+      - ollama
+    restart: "no"
 
   ai-service:
     build: ./ai-service
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    environment:
+      - SCORING_STRATEGY=${SCORING_STRATEGY:-heuristic}
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
+      - OLLAMA_EMBED_URL=http://ollama:11434/api/embeddings
+      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+    depends_on:
+      - ollama
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongo:27017/thumbnail_optimizer
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-60m}
+      - UPLOAD_DIR=/app/uploads
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-8080}:80"
     depends_on:
       - backend
 
 volumes:
   mongo_data:
+  ollama_data:
+  uploads:

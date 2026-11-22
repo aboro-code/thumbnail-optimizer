@@ -1,0 +1,27 @@
+# HTTPS add-on for a public server. Caddy gets a free Let's Encrypt certificate
+# for DOMAIN and forwards traffic to the frontend (nginx), which serves the SPA
+# and proxies /api and /uploads to the backend.
+#
+#   DOMAIN=<your-ip-with-dashes>.sslip.io   (or your own domain) in .env, then:
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+services:
+  frontend:
+    # Only Caddy is exposed to the internet in this mode.
+    ports: !reset []
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in .env} --to frontend:80
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  caddy_data:
+  caddy_config:
