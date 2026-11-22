@@ -2,17 +2,26 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import ABTestDetailPage from "./pages/ABTestDetailPage";
 import ABTestsListPage from "./pages/ABTestsListPage";
+import AdminPage from "./pages/AdminPage";
 import CompleteProfilePage from "./pages/CompleteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import OptimizePage from "./pages/OptimizePage";
 import ReportsPage from "./pages/ReportsPage";
+import SignupPage from "./pages/SignupPage";
+import TeamPage from "./pages/TeamPage";
 import ThumbnailsPage from "./pages/ThumbnailsPage";
 import UploadPage from "./pages/UploadPage";
-import { getToken } from "./lib/api";
+import { getToken, getUser } from "./lib/api";
 
 function RequireAuth({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
+}
+
+// UI-only guard; the backend re-checks the role on every /admin request.
+function RequireAdmin({ children }) {
+  if (!getToken()) return <Navigate to="/login" replace />;
+  return getUser()?.role === "Admin" ? children : <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -20,6 +29,31 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route
+          path="/team"
+          element={
+            <RequireAuth>
+              <TeamPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/thumbnails/:id/optimize"
+          element={
+            <RequireAuth>
+              <OptimizePage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/complete-profile"
           element={

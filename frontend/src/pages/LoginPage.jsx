@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, setToken, setUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
@@ -150,6 +150,13 @@ export default function LoginPage() {
             {submitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          New here?{" "}
+          <Link to="/signup" className="font-medium text-primary hover:underline">
+            Create an account
+          </Link>
+        </p>
       </div>
     </div>
   );

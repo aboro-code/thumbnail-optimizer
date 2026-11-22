@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { api, clearToken, clearUser } from "../lib/api";
+import { api, clearToken, clearUser, getUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
 import ThumbnailCard from "../components/ThumbnailCard";
 import { LoadingRegion, Skeleton } from "../components/Skeleton";
@@ -12,7 +12,16 @@ const NAV_LINKS = [
   { to: "/thumbnails", label: "Thumbnails" },
   { to: "/abtests", label: "A/B tests" },
   { to: "/reports", label: "Reports" },
+  { to: "/team", label: "Team", roles: ["Creator", "Manager"] },
+  { to: "/admin", label: "Admin", roles: ["Admin"] },
 ];
+
+// Says whose data the numbers cover, since a Manager's dashboard includes their team.
+const SCOPE_TEXT = {
+  own: "Showing your own thumbnails and tests.",
+  team: "Showing your data and your team's.",
+  all: "Showing data from every account.",
+};
 
 function KpiTile({ label, value, hint }) {
   return (
@@ -170,6 +179,7 @@ export default function DashboardPage() {
   }
 
   const lift = summary?.avg_predicted_lift;
+  const user = getUser();
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
@@ -180,7 +190,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Main" className="flex flex-wrap gap-2">
-            {NAV_LINKS.map((link) => (
+            {NAV_LINKS.filter((link) => !link.roles || link.roles.includes(user?.role)).map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -217,7 +227,8 @@ export default function DashboardPage() {
 
       {summary && thumbnails && (
         <>
-          <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4" aria-label="Summary">
+          {summary.scope && <p className="mt-6 text-sm text-muted-foreground">{SCOPE_TEXT[summary.scope]}</p>}
+          <section className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4" aria-label="Summary">
             <KpiTile
               label="Thumbnails scored"
               value={summary.thumbnails_scored}
