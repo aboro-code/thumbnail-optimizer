@@ -1,10 +1,11 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 
 const User = require("../models/User");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, DEACTIVATED } = require("../middleware/auth");
+const { startSession, signAccessToken, consumeRefreshToken, issueRefreshToken, endSession } = require("../services/sessions");
+const { accountSummary, deleteAccount } = require("../services/accounts");
 const { verifyGoogleCredential } = require("../services/googleAuth");
 const { findManagerByCode } = require("../services/teams");
 
@@ -16,7 +17,6 @@ function publicUser(user) {
   return { id: user._id, email: user.email, role: user.role, name: user.name, manager_id: user.manager_id || null };
 }
 
-const DEACTIVATED = { message: "This account has been deactivated. Contact an administrator." };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -29,14 +29,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many attempts. Please try again later." },
 });
-
-function signToken(user) {
-  return jwt.sign(
-    { sub: user._id.toString(), role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "60m" }
-  );
-}
 
 // POST /api/v1/auth/signup
 router.post("/signup", authLimiter, async (req, res) => {
@@ -80,7 +72,7 @@ router.post("/signup", authLimiter, async (req, res) => {
       manager_id: manager ? manager._id : null,
     });
 
-    const token = signToken(user);
+    const token = await startSession(req, res, user);
     res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ message: "Failed to create account" });
@@ -105,11 +97,11 @@ router.post("/login", authLimiter, async (req, res) => {
     if (!matches) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-    if (user.active === false) {
+    if (user.status === "deactivated") {
       return res.status(403).json(DEACTIVATED);
     }
 
-    const token = signToken(user);
+    const token = await startSession(req, res, user);
     res.json({ token, user: publicUser(user) });
   } catch (err) {
     res.status(500).json({ message: "Failed to log in" });
@@ -155,12 +147,12 @@ router.post("/google", authLimiter, async (req, res) => {
     } else if (user.google_id !== profile.googleId) {
       return res.status(409).json({ message: "This email is linked to a different Google account" });
     }
-    if (user.active === false) {
+    if (user.status === "deactivated") {
       return res.status(403).json(DEACTIVATED);
     }
 
     res.json({
-      token: signToken(user),
+      token: await startSession(req, res, user),
       user: publicUser(user),
       needs_profile: !user.profile_complete,
     });
@@ -196,10 +188,70 @@ router.patch("/profile", requireAuth, async (req, res) => {
     user.profile_complete = true;
     await user.save();
 
-    res.json({ token: signToken(user), user: publicUser(user), needs_profile: false });
+    res.json({ token: signAccessToken(user), user: publicUser(user), needs_profile: false });
   } catch (err) {
     res.status(500).json({ message: "Failed to save profile" });
   }
+});
+
+// POST /api/v1/auth/refresh
+// Swaps the refresh-token cookie for a new access token (and a new cookie).
+router.post("/refresh", async (req, res) => {
+  try {
+    const row = await consumeRefreshToken(req);
+    if (!row) return res.status(401).json({ code: "SESSION_EXPIRED", message: "Please sign in again" });
+
+    const user = await User.findById(row.user_id);
+    if (!user) return res.status(401).json({ code: "ACCOUNT_DELETED", message: "This account no longer exists." });
+    if (user.status === "deactivated") return res.status(403).json(DEACTIVATED);
+
+    await issueRefreshToken(req, res, user);
+    res.json({ token: signAccessToken(user), user: publicUser(user) });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to refresh the session" });
+  }
+});
+
+// POST /api/v1/auth/logout - ends this browser's session.
+router.post("/logout", async (req, res) => {
+  await endSession(req, res);
+  res.status(204).end();
+});
+
+// GET /api/v1/auth/me - the signed-in user as stored now (live role, team, status).
+router.get("/me", requireAuth, async (req, res) => {
+  const user = await User.findById(req.user.sub);
+  if (!user) return res.status(404).json({ message: "Account not found" });
+  res.json({ user: publicUser(user), sign_in: user.password_hash ? "password" : "google" });
+});
+
+// GET /api/v1/auth/me/summary - what deleting your account would remove.
+router.get("/me/summary", requireAuth, async (req, res) => {
+  res.json(await accountSummary(req.user.sub));
+});
+
+// DELETE /api/v1/auth/me  { password } or, for Google-only accounts, { confirm_email }
+// Creators and Managers can delete their own account (D-45). Admins can't, so
+// the system is never left without one.
+router.delete("/me", requireAuth, async (req, res) => {
+  const user = await User.findById(req.user.sub);
+  if (!user) return res.status(404).json({ message: "Account not found" });
+  if (user.role === "Admin") {
+    return res.status(403).json({ message: "Admin accounts can't be deleted here" });
+  }
+
+  const { password, confirm_email: confirmEmail } = req.body || {};
+  if (user.password_hash) {
+    if (!password || !(await bcrypt.compare(password, user.password_hash))) {
+      return res.status(401).json({ message: "Password is incorrect" });
+    }
+  } else if (typeof confirmEmail !== "string" || confirmEmail.trim().toLowerCase() !== user.email) {
+    return res.status(400).json({ message: "Type your email address to confirm" });
+  }
+
+  const removed = await deleteAccount(user._id);
+  await endSession(req, res);
+  res.json({ deleted: true, removed });
 });
 
 module.exports = router;

@@ -16,7 +16,19 @@ const adminRoutes = require("./routes/admin");
 
 const app = express();
 
-app.use(cors());
+// Behind a hosting proxy (Render, a load balancer) set TRUST_PROXY to the number
+// of proxies, so req.ip is the visitor's address (used by the rate limiter).
+if (process.env.TRUST_PROXY) {
+  app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+}
+
+// Credentials are needed for the refresh-token cookie when the frontend runs on
+// another port in development (Vite on :5173). In Docker everything is one origin.
+const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json());
 // Serve from the same folder uploads are written to (UPLOAD_DIR), not a hard-coded path.
 app.use("/uploads", express.static(UPLOAD_DIR));
