@@ -10,7 +10,7 @@ const {
 } = require("../services/abtestReport");
 const { latestScoresByThumbnail } = require("../services/predictionLookup");
 
-const { ownerFilter, canAccessOwner, canAccessAllOwners } = require("../services/access");
+const { ownerFilter, canAccessOwner } = require("../services/access");
 
 const router = express.Router();
 
@@ -45,12 +45,18 @@ router.post("/", requireAuth, requireRole("Creator", "Manager", "Admin"), async 
     return res.status(404).json({ message: "One or more thumbnails were not found" });
   }
 
-  if (!(await canAccessAllOwners(req.user, thumbnails.map((t) => t.user_id)))) {
+  // One owner per test (D-44): every variant must belong to the same user.
+  const ownerIds = [...new Set(thumbnails.map((t) => String(t.user_id)))];
+  if (ownerIds.length !== 1) {
+    return res.status(400).json({ message: "All thumbnails in a test must belong to the same person" });
+  }
+  if (!(await canAccessOwner(req.user, ownerIds[0]))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
   const abTest = await ABTest.create({
     created_by: req.user.sub,
+    owner_id: ownerIds[0],
     content_reference,
     start_date: start,
     end_date: end,
@@ -79,7 +85,7 @@ router.get("/", requireAuth, async (req, res) => {
     return res.status(400).json({ message: `status must be one of ${STATUSES.join(", ")}` });
   }
 
-  const filter = await ownerFilter(req.user, "created_by");
+  const filter = await ownerFilter(req.user, "owner_id");
   if (status) filter.status = status;
 
   const tests = await ABTest.find(filter).sort({ createdAt: -1 });
@@ -114,7 +120,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   if (!test) {
     return res.status(404).json({ message: "A/B test not found" });
   }
-  if (!(await canAccessOwner(req.user, test.created_by))) {
+  if (!(await canAccessOwner(req.user, test.owner_id))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 
@@ -159,7 +165,7 @@ router.patch(
     if (!abTest) {
       return res.status(404).json({ message: "A/B test not found" });
     }
-    if (!(await canAccessOwner(req.user, abTest.created_by))) {
+    if (!(await canAccessOwner(req.user, abTest.owner_id))) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
 
@@ -188,7 +194,9 @@ router.patch(
 );
 
 // PATCH /api/v1/abtests/:id/status
-router.patch("/:id/status", requireAuth, requireRole("Manager", "Admin"), async (req, res) => {
+// The test's owner closes it (D-43): a Creator their own tests, a Manager their
+// own and their team's, an Admin any.
+router.patch("/:id/status", requireAuth, async (req, res) => {
   const { status } = req.body || {};
   if (!["COMPLETED", "CANCELLED"].includes(status)) {
     return res.status(400).json({ message: "status must be COMPLETED or CANCELLED" });
@@ -203,8 +211,7 @@ router.patch("/:id/status", requireAuth, requireRole("Manager", "Admin"), async 
   if (!current) {
     return res.status(404).json({ message: "A/B test not found" });
   }
-  // A Manager can only close tests from their own team.
-  if (!(await canAccessOwner(req.user, current.created_by))) {
+  if (!(await canAccessOwner(req.user, current.owner_id))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 

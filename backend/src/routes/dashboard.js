@@ -21,7 +21,7 @@ function round1(value) {
 // The PRD §3.1 dashboard metrics, computed server-side so the page needs one request.
 // Scoped like every other list: Creators see their own data, Managers their team's, Admins all.
 router.get("/summary", requireAuth, async (req, res) => {
-  const [byUser, byCreator] = await Promise.all([ownerFilter(req.user), ownerFilter(req.user, "created_by")]);
+  const [byUser, byCreator] = await Promise.all([ownerFilter(req.user), ownerFilter(req.user, "owner_id")]);
 
   const [thumbnails, tests, reportsGenerated] = await Promise.all([
     Thumbnail.find(byUser).select("_id"),

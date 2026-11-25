@@ -8,7 +8,11 @@ const variantSchema = new mongoose.Schema({
 });
 
 const abTestSchema = new mongoose.Schema({
+  // Who clicked "Create" (audit only, e.g. a Manager starting a test for a creator).
   created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  // Whose test it is: the owner of all its thumbnails (D-44). Visibility,
+  // closing, reports and the dashboard all use this field.
+  owner_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
   content_reference: { type: String, required: true },
   status: {
     type: String,
@@ -22,5 +26,13 @@ const abTestSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 abTestSchema.index({ status: 1 });
+
+// Fallback for tests written without an owner (e.g. created directly in code):
+// the creator owns it. Existing documents are backfilled from their thumbnails
+// by config/migrations.js.
+abTestSchema.pre("validate", function setDefaultOwner(next) {
+  if (!this.owner_id) this.owner_id = this.created_by;
+  next();
+});
 
 module.exports = mongoose.model("ABTest", abTestSchema);

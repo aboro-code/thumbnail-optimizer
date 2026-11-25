@@ -29,7 +29,7 @@ router.get("/:abTestId/export", requireAuth, async (req, res) => {
   if (!test) {
     return res.status(404).json({ message: "A/B test not found" });
   }
-  if (!(await canAccessOwner(req.user, test.created_by))) {
+  if (!(await canAccessOwner(req.user, test.owner_id))) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
 

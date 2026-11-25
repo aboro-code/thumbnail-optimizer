@@ -17,7 +17,7 @@ async function visibleUserIds(user) {
 }
 
 // Mongo filter limiting a query to the documents this user may see.
-// `field` is the owner field: user_id on thumbnails/exports, created_by on A/B tests.
+// `field` is the owner field: user_id on thumbnails/exports, owner_id on A/B tests.
 async function ownerFilter(user, field = "user_id") {
   const ids = await visibleUserIds(user);
   if (ids === null) return {};
@@ -26,6 +26,7 @@ async function ownerFilter(user, field = "user_id") {
 
 async function canAccessOwner(user, ownerId) {
   const ids = await visibleUserIds(user);
+  if (!ownerId) return ids === null;
   return ids === null || ids.includes(ownerId.toString());
 }
 
