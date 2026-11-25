@@ -127,11 +127,14 @@ To give every creator — not just those with a data science team — an objecti
 | LLM API cost/rate limits for explanation generation | Low | Medium | Cache explanations per thumbnail; fall back to a rule-based explanation template if the LLM call fails or is rate-limited. |
 
 ### 1.14 MVP Scope
-* **In Scope:** CV-based CTR scoring & explanation engine; A/B testing module with manual/CSV-synced engagement data; JWT authentication with role-based access; MongoDB-backed data models; REST API; responsive React dashboard; PDF/CSV export.
+* **In Scope:** CV-based CTR scoring & explanation engine; A/B testing module with manually entered engagement data (impressions and clicks per variant); JWT authentication with role-based access; MongoDB-backed data models; REST API; responsive React dashboard; PDF/CSV export.
 * **Out of Scope (this build):** Fully automated live sync of impressions/clicks from external platforms; native mobile apps; multi-tenant billing/SaaS infrastructure; production-grade CI/CD and container orchestration (documented as a future extension, not required for MVP grading).
 
 ### 1.15 Future Scope
-* Real-time analytics and live platform API sync for engagement data.
+* **YouTube results for A/B tests.** Engagement data is entered manually in this build. Two paths to real data:
+  * *Record YouTube Test & Compare results:* the creator takes the app's top 3 candidates into YouTube Studio's built-in Test & Compare (up to 3 thumbnails per video, desktop Studio only), then records which one YouTube picked. That result feeds `prediction_matched_winner` and the AI accuracy metric. Test & Compare has no public API, so this step stays manual.
+  * *Thumbnail rotation with reach data:* the creator connects their channel (OAuth). The app swaps the live thumbnail every N days through `thumbnails.set` and fills each variant's impressions and clicks from the YouTube Reporting API reach reports (`video_thumbnail_impressions`, `video_thumbnail_impressions_ctr`). These reports are daily and arrive a day or two late, so the data is not real-time. Needs a background job and Google app verification for the YouTube scopes.
+  * *Not pursued:* live view counts (YouTube Data API) can't be split per thumbnail, and per-video CSV exports from Studio don't map to variants.
 * Multi-tenant support for agencies managing many client accounts, with per-tenant billing.
 * Mobile-friendly PWA packaging.
 * Model drift monitoring as the scoring model is retrained on growing real A/B outcome data.
@@ -640,11 +643,11 @@ The project brief points to two reference materials as domain background:
 ## 10. Security Design
 
 ### 10.1 Authentication & Authorization
-* **Authentication:** JWT (HMAC-SHA256 signed), short-lived access tokens (e.g., 60-minute expiry) with refresh tokens for session continuity.
+* **Authentication:** JWT (HMAC-SHA256 signed), short-lived access tokens (e.g., 60-minute expiry) with refresh tokens for session continuity. *Implemented:* a 7-day refresh token in an httpOnly cookie, stored only as a SHA-256 hash and rotated on every use. The API loads the user's role and status from the database on every request, so role changes, deactivation and deletion take effect immediately.
 * **Role-Based Access Control (RBAC):**
-  * `Creator`: Upload thumbnails, view own predictions/tests, launch A/B tests on own content.
-  * `Manager`: Everything a Creator can do, across managed team accounts; approve/close tests; export reports.
-  * `Admin`: Full system configuration, user management, and access to the admin analytics panel.
+  * `Creator`: Upload thumbnails, view own predictions/tests, launch and close A/B tests on own content, delete own account.
+  * `Manager`: Everything a Creator can do, across managed team accounts; close the team's tests; export reports. A test belongs to the owner of its thumbnails (all variants must share one owner), even when a Manager started it.
+  * `Admin`: Full system configuration, user management (role, team, deactivate, delete Creators and Managers), and access to the admin analytics panel.
 
 ### 10.2 Input Validation & Media Security
 * Strict MIME-type checking on image uploads (`image/jpeg`, `image/png`, `image/webp` only).

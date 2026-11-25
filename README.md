@@ -61,9 +61,11 @@ thumbnail-optimizer/
 ```
 
 ## Roles and teams
-- **Creator:** uploads, scores and tests their own thumbnails. Can join a manager's team with an invite code, at sign-up or on the Team page.
-- **Manager:** sees their own data plus their team's. Shares an invite code and can close A/B tests for the team.
-- **Admin:** sees everything. On the Admin page they manage users (role, team, deactivate), view system analytics, and check the model and LLM status. Admins can't sign up; they are created with `scripts/create-admin.js`.
+- **Creator:** uploads, scores and tests their own thumbnails, and closes their own A/B tests. Can join a manager's team with an invite code, at sign-up or on the Team page.
+- **Manager:** sees their own data plus their team's. Shares an invite code and can close A/B tests for the team. A test always belongs to the person whose thumbnails it compares, even when a Manager started it.
+- **Admin:** sees everything. On the Admin page they manage users (role, team, deactivate, delete), view system analytics, and check the model and LLM status. Admins can't sign up; they are created with `scripts/create-admin.js`.
+- **Accounts:** Creators and Managers can delete their own account on the Account page. Only Admins deactivate accounts. Role changes and deactivation take effect on the user's next request: the API reads the role and status from the database every time.
+- **Sessions:** a 60-minute access token plus a 7-day refresh token in an httpOnly cookie, rotated on every use.
 
 ## Quick Start with Docker (recommended)
 ```bash
@@ -126,22 +128,26 @@ All routes are under `/api/v1` and, apart from signup/login/Google, need `Author
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/auth/signup`, `/auth/login`, `/auth/google` | Get a JWT |
+| POST | `/auth/signup`, `/auth/login`, `/auth/google` | Get a JWT (and a refresh-token cookie) |
+| POST | `/auth/refresh`, `/auth/logout` | New access token from the refresh cookie / end the session |
+| GET, DELETE | `/auth/me`, `/auth/me/summary` | The signed-in user (live role) / what deleting it removes; `DELETE /auth/me` deletes your own account |
 | PATCH | `/auth/profile` | Complete a Google user's profile |
 | POST | `/thumbnails/upload` | Upload 2–10 images (validated by file signature) |
 | GET | `/thumbnails`, `/thumbnails/:id` | List / view thumbnails |
 | GET | `/thumbnails/:id/batch` | The batch a thumbnail was uploaded with, ranked by latest score (for reopening it in Optimize) |
-| POST | `/predictions/analyze` | Score and rank a set of thumbnails |
+| POST | `/predictions/analyze` | Score and rank a set of thumbnails (instant; no LLM) |
+| POST | `/predictions/explain` | Write the LLM explanation for a thumbnail's latest score |
 | POST, GET | `/abtests`, `/abtests/:id` | Create / list / view A/B tests |
 | PATCH | `/abtests/:id/variants/:variantId/metrics` | Record impressions and clicks |
-| PATCH | `/abtests/:id/status` | Close a test and declare the winner (Manager for their team, Admin) |
+| PATCH | `/abtests/:id/status` | Close a test and declare the winner (its owner, their Manager, or an Admin) |
 | GET | `/reports/:abTestId/export?format=pdf\|csv` | Download an A/B test report (thumbnails, predictions, results) |
 | GET | `/reports` | History of exported reports |
 | GET | `/dashboard/summary` | Dashboard metrics: scored count, active tests, avg. predicted lift, AI accuracy, reports, score distribution |
 | GET | `/team` | Manager: invite code + members. Creator: their manager |
 | POST | `/team/join`, `/team/leave` | Creator joins (with an invite code) or leaves a team |
 | POST, DELETE | `/team/invite-code`, `/team/members/:id` | Manager: new invite code / remove a member |
-| GET, PATCH | `/admin/users`, `/admin/users/:id` | Admin: list users; change role, manager or active status |
+| GET, PATCH, DELETE | `/admin/users`, `/admin/users/:id` | Admin: list users; change role, manager or status; delete an account |
+| GET | `/admin/users/:id/summary` | Admin: what deleting an account would remove |
 | GET | `/admin/analytics`, `/admin/model-info` | Admin: system totals; active scoring strategy and Ollama status |
 
 ## Tests
