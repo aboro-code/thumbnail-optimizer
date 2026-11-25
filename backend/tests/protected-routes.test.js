@@ -1,17 +1,22 @@
-const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const request = require("supertest");
+const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 
-beforeAll(() => {
+let mongod;
+
+beforeAll(async () => {
   process.env.JWT_SECRET = "test-secret";
+  mongod = await MongoMemoryServer.create();
+  await mongoose.connect(mongod.getUri());
 });
 
-function tokenFor(role) {
-  return jwt.sign({ sub: "000000000000000000000000", role }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-}
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongod.stop();
+});
 
 describe.each([
   ["POST", "/api/v1/thumbnails/upload"],
@@ -36,22 +41,30 @@ describe("role enforcement", () => {
   it("allows a Creator to upload thumbnails", async () => {
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
   });
 
-  it("blocks a Creator from closing an A/B test", async () => {
+  it("blocks a Creator from the admin API", async () => {
+    const res = await request(app)
+      .get("/api/v1/admin/users")
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
+    expect(res.status).toBe(403);
+  });
+
+  it("lets a Creator reach the close-test route (owner check happens there)", async () => {
     const res = await request(app)
       .patch("/api/v1/abtests/000000000000000000000000/status")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
-    expect(res.status).toBe(403);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
+    expect(res.status).not.toBe(401);
+    expect(res.status).not.toBe(403);
   });
 
   it("allows a Manager to close an A/B test", async () => {
     const res = await request(app)
       .patch("/api/v1/abtests/000000000000000000000000/status")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Manager")}`);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
   });
@@ -59,7 +72,7 @@ describe("role enforcement", () => {
   it("allows any authenticated role to trigger a prediction", async () => {
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
     expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(403);
   });

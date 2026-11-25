@@ -12,7 +12,7 @@ function member(user) {
     id: user._id,
     email: user.email,
     name: user.name || null,
-    active: user.active !== false,
+    status: user.status || "active",
     joined_at: user.created_at,
   };
 }

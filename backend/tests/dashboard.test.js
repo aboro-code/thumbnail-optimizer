@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 const Thumbnail = require("../src/models/Thumbnail");
 const Prediction = require("../src/models/Prediction");
 const ABTest = require("../src/models/ABTest");
@@ -11,9 +11,6 @@ const ReportExport = require("../src/models/ReportExport");
 
 let mongod;
 
-function tokenFor(role, sub = new mongoose.Types.ObjectId().toString()) {
-  return jwt.sign({ sub, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
-}
 
 async function thumbnail(userId, score) {
   const t = await Thumbnail.create({ user_id: userId, image_url: "/uploads/x.jpg" });
@@ -84,7 +81,7 @@ describe("GET /api/v1/dashboard/summary", () => {
 
     const res = await request(app)
       .get("/api/v1/dashboard/summary")
-      .set("Authorization", `Bearer ${tokenFor("Creator", creatorId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", creatorId)}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -107,7 +104,7 @@ describe("GET /api/v1/dashboard/summary", () => {
 
     const res = await request(app)
       .get("/api/v1/dashboard/summary")
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(res.body.thumbnails_total).toBe(6);
     expect(res.body.reports_generated).toBe(3);
@@ -117,7 +114,7 @@ describe("GET /api/v1/dashboard/summary", () => {
   it("returns empty metrics, with null lift, for a new user", async () => {
     const res = await request(app)
       .get("/api/v1/dashboard/summary")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.body).toMatchObject({
       thumbnails_total: 0,
@@ -135,7 +132,7 @@ describe("GET /api/v1/dashboard/summary", () => {
 
     const res = await request(app)
       .get("/api/v1/dashboard/summary")
-      .set("Authorization", `Bearer ${tokenFor("Creator", creatorId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", creatorId)}`);
 
     expect(res.body.score_distribution).toHaveLength(10);
     expect(res.body.score_distribution[9].count).toBe(1);

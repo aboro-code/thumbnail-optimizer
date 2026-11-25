@@ -6,11 +6,11 @@ const testUploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "thumbnail-uploads-"
 process.env.UPLOAD_DIR = testUploadDir;
 
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 const Thumbnail = require("../src/models/Thumbnail");
 const Prediction = require("../src/models/Prediction");
 
@@ -26,11 +26,8 @@ const PNG_BUFFER = Buffer.concat([
 ]);
 const FAKE_EXE_AS_JPEG = Buffer.concat([Buffer.from("MZ"), Buffer.alloc(100, 0)]);
 
-function tokenFor(role, sub = new mongoose.Types.ObjectId().toString()) {
-  return jwt.sign({ sub, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
-}
 
-function creatorToken() {
+async function creatorToken() {
   return tokenFor("Creator");
 }
 
@@ -54,7 +51,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
   it("uploads a valid batch and creates thumbnail records", async () => {
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .field("content_title", "My Video")
       .field("target_platform", "YouTube")
       .attach("files", JPEG_BUFFER, { filename: "a.jpg", contentType: "image/jpeg" })
@@ -73,7 +70,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
   it("serves uploaded images from the configured UPLOAD_DIR", async () => {
     await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .attach("files", JPEG_BUFFER, { filename: "a.jpg", contentType: "image/jpeg" })
       .attach("files", PNG_BUFFER, { filename: "b.png", contentType: "image/png" });
 
@@ -86,7 +83,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
   it("rejects a batch with fewer than 2 files", async () => {
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .attach("files", JPEG_BUFFER, { filename: "a.jpg", contentType: "image/jpeg" });
 
     expect(res.status).toBe(400);
@@ -95,7 +92,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
   it("rejects a disguised executable renamed to .jpg (TEST-04)", async () => {
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .attach("files", FAKE_EXE_AS_JPEG, { filename: "virus.jpg", contentType: "image/jpeg" })
       .attach("files", JPEG_BUFFER, { filename: "b.jpg", contentType: "image/jpeg" });
 
@@ -108,7 +105,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
   it("rejects an unsupported declared mime type", async () => {
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .attach("files", Buffer.from("<svg></svg>"), {
         filename: "a.svg",
         contentType: "image/svg+xml",
@@ -126,7 +123,7 @@ describe("POST /api/v1/thumbnails/upload", () => {
 
     const res = await request(app)
       .post("/api/v1/thumbnails/upload")
-      .set("Authorization", `Bearer ${creatorToken()}`)
+      .set("Authorization", `Bearer ${await creatorToken()}`)
       .attach("files", oversized, { filename: "big.jpg", contentType: "image/jpeg" })
       .attach("files", JPEG_BUFFER, { filename: "b.jpg", contentType: "image/jpeg" });
 
@@ -143,7 +140,7 @@ describe("GET /api/v1/thumbnails", () => {
 
     const res = await request(app)
       .get("/api/v1/thumbnails")
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerA)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerA)}`);
 
     expect(res.status).toBe(200);
     expect(res.body.thumbnails).toHaveLength(1);
@@ -158,7 +155,7 @@ describe("GET /api/v1/thumbnails", () => {
 
     const res = await request(app)
       .get("/api/v1/thumbnails")
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
     expect(res.body.thumbnails).toHaveLength(2);
@@ -173,7 +170,7 @@ describe("GET /api/v1/thumbnails", () => {
 
     const res = await request(app)
       .get("/api/v1/thumbnails")
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     const byId = Object.fromEntries(res.body.thumbnails.map((t) => [t._id, t.latest_ctr_score]));
     expect(byId[scored._id.toString()]).toBe(72.5);
@@ -187,7 +184,7 @@ describe("GET /api/v1/thumbnails", () => {
 
     const res = await request(app)
       .get("/api/v1/thumbnails?status=SCORED")
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     expect(res.status).toBe(200);
     expect(res.body.thumbnails).toHaveLength(1);
@@ -197,7 +194,7 @@ describe("GET /api/v1/thumbnails", () => {
   it("rejects an invalid status filter", async () => {
     const res = await request(app)
       .get("/api/v1/thumbnails?status=NOT_A_STATUS")
-      .set("Authorization", `Bearer ${creatorToken()}`);
+      .set("Authorization", `Bearer ${await creatorToken()}`);
 
     expect(res.status).toBe(400);
   });
@@ -210,7 +207,7 @@ describe("GET /api/v1/thumbnails/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/thumbnails/${thumb._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     expect(res.status).toBe(200);
     expect(res.body._id).toBe(thumb._id.toString());
@@ -222,7 +219,7 @@ describe("GET /api/v1/thumbnails/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/thumbnails/${thumb._id}`)
-      .set("Authorization", `Bearer ${creatorToken()}`);
+      .set("Authorization", `Bearer ${await creatorToken()}`);
 
     expect(res.status).toBe(403);
   });
@@ -233,7 +230,7 @@ describe("GET /api/v1/thumbnails/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/thumbnails/${thumb._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
   });
@@ -241,7 +238,7 @@ describe("GET /api/v1/thumbnails/:id", () => {
   it("returns 404 for a well-formed but unknown id", async () => {
     const res = await request(app)
       .get(`/api/v1/thumbnails/${new mongoose.Types.ObjectId()}`)
-      .set("Authorization", `Bearer ${creatorToken()}`);
+      .set("Authorization", `Bearer ${await creatorToken()}`);
 
     expect(res.status).toBe(404);
   });
@@ -249,7 +246,7 @@ describe("GET /api/v1/thumbnails/:id", () => {
   it("returns 400 for a malformed id", async () => {
     const res = await request(app)
       .get("/api/v1/thumbnails/not-an-id")
-      .set("Authorization", `Bearer ${creatorToken()}`);
+      .set("Authorization", `Bearer ${await creatorToken()}`);
 
     expect(res.status).toBe(400);
   });

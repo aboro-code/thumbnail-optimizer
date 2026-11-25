@@ -1,18 +1,15 @@
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 const Thumbnail = require("../src/models/Thumbnail");
 const Prediction = require("../src/models/Prediction");
 const ABTest = require("../src/models/ABTest");
 
 let mongod;
 
-function tokenFor(role, sub = new mongoose.Types.ObjectId().toString()) {
-  return jwt.sign({ sub, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
-}
 
 async function createThumbnail(userId) {
   return Thumbnail.create({ user_id: userId, image_url: "/uploads/a.jpg", status: "UPLOADED" });
@@ -41,7 +38,7 @@ describe("POST /api/v1/abtests", () => {
 
     const res = await request(app)
       .post("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({
         content_reference: "youtube.com/watch?v=abc123",
         variant_thumbnail_ids: [a._id.toString(), b._id.toString()],
@@ -63,7 +60,7 @@ describe("POST /api/v1/abtests", () => {
 
     const res = await request(app)
       .post("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({
         content_reference: "ref",
         variant_thumbnail_ids: [a._id.toString()],
@@ -81,7 +78,7 @@ describe("POST /api/v1/abtests", () => {
 
     const res = await request(app)
       .post("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({
         content_reference: "ref",
         variant_thumbnail_ids: [a._id.toString(), b._id.toString()],
@@ -98,7 +95,7 @@ describe("POST /api/v1/abtests", () => {
 
     const res = await request(app)
       .post("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({
         content_reference: "ref",
         variant_thumbnail_ids: [a._id.toString(), new mongoose.Types.ObjectId().toString()],
@@ -116,7 +113,7 @@ describe("POST /api/v1/abtests", () => {
 
     const res = await request(app)
       .post("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({
         content_reference: "ref",
         variant_thumbnail_ids: [a._id.toString(), b._id.toString()],
@@ -149,7 +146,7 @@ describe("PATCH /api/v1/abtests/:id/variants/:variantId/metrics", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/variants/${variantId}/metrics`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({ impressions: 200, clicks: 25 });
 
     expect(res.status).toBe(200);
@@ -163,7 +160,7 @@ describe("PATCH /api/v1/abtests/:id/variants/:variantId/metrics", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/variants/${variantId}/metrics`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({ impressions: 10, clicks: 50 });
 
     expect(res.status).toBe(400);
@@ -175,7 +172,7 @@ describe("PATCH /api/v1/abtests/:id/variants/:variantId/metrics", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/variants/${new mongoose.Types.ObjectId()}/metrics`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({ impressions: 10, clicks: 1 });
 
     expect(res.status).toBe(404);
@@ -188,7 +185,7 @@ describe("PATCH /api/v1/abtests/:id/variants/:variantId/metrics", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/variants/${variantId}/metrics`)
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({ impressions: 10, clicks: 1 });
 
     expect(res.status).toBe(403);
@@ -218,7 +215,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.status).toBe(200);
@@ -238,7 +235,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBe(true);
@@ -253,7 +250,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBe(false);
@@ -265,7 +262,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.body.prediction_matched_winner).toBeNull();
@@ -277,13 +274,13 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const first = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
     expect(first.status).toBe(200);
 
     const second = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(second.status).toBe(409);
@@ -295,7 +292,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/v1/abtests/${abTest._id}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "RUNNING" });
 
     expect(res.status).toBe(400);
@@ -304,7 +301,7 @@ describe("PATCH /api/v1/abtests/:id/status", () => {
   it("returns 404 for an unknown test id", async () => {
     const res = await request(app)
       .patch(`/api/v1/abtests/${new mongoose.Types.ObjectId()}/status`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ status: "COMPLETED" });
 
     expect(res.status).toBe(404);
@@ -336,7 +333,7 @@ describe("GET /api/v1/abtests", () => {
 
     const res = await request(app)
       .get("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerA)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerA)}`);
 
     expect(res.status).toBe(200);
     expect(res.body.ab_tests).toHaveLength(1);
@@ -368,7 +365,7 @@ describe("GET /api/v1/abtests", () => {
 
     const res = await request(app)
       .get("/api/v1/abtests")
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
     expect(res.body.ab_tests).toHaveLength(2);
@@ -397,7 +394,7 @@ describe("GET /api/v1/abtests", () => {
 
     const res = await request(app)
       .get("/api/v1/abtests?status=CANCELLED")
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     expect(res.status).toBe(200);
     expect(res.body.ab_tests).toHaveLength(1);
@@ -407,7 +404,7 @@ describe("GET /api/v1/abtests", () => {
   it("rejects an invalid status filter", async () => {
     const res = await request(app)
       .get("/api/v1/abtests?status=NOT_A_STATUS")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.status).toBe(400);
   });
@@ -428,7 +425,7 @@ describe("GET /api/v1/abtests/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/abtests/${test._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     expect(res.status).toBe(200);
     expect(res.body.variants[0].thumbnail_id.image_url).toBe("/uploads/a.jpg");
@@ -449,7 +446,7 @@ describe("GET /api/v1/abtests/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/abtests/${test._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", owner)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", owner)}`);
 
     expect(res.body.variants.map((v) => v.predicted_ctr_score)).toEqual([81.4, null]);
   });
@@ -468,7 +465,7 @@ describe("GET /api/v1/abtests/:id", () => {
 
     const res = await request(app)
       .get(`/api/v1/abtests/${test._id}`)
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.status).toBe(403);
   });
@@ -476,7 +473,7 @@ describe("GET /api/v1/abtests/:id", () => {
   it("returns 404 for a well-formed but unknown id", async () => {
     const res = await request(app)
       .get(`/api/v1/abtests/${new mongoose.Types.ObjectId()}`)
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.status).toBe(404);
   });
@@ -484,7 +481,7 @@ describe("GET /api/v1/abtests/:id", () => {
   it("returns 400 for a malformed id", async () => {
     const res = await request(app)
       .get("/api/v1/abtests/not-an-id")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.status).toBe(400);
   });

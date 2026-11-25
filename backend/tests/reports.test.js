@@ -6,12 +6,12 @@ const testUploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "thumbnail-uploads-"
 process.env.UPLOAD_DIR = testUploadDir;
 
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const sharp = require("sharp");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 const Thumbnail = require("../src/models/Thumbnail");
 const Prediction = require("../src/models/Prediction");
 const ABTest = require("../src/models/ABTest");
@@ -19,9 +19,6 @@ const { csvCell } = require("../src/services/reportExport");
 
 let mongod;
 
-function tokenFor(role, sub = new mongoose.Types.ObjectId().toString()) {
-  return jwt.sign({ sub, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
-}
 
 function binaryParser(res, callback) {
   const chunks = [];
@@ -100,7 +97,7 @@ describe("GET /api/v1/reports/:abTestId/export?format=csv", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`);
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/text\/csv/);
@@ -132,7 +129,7 @@ describe("GET /api/v1/reports/:abTestId/export?format=csv", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`);
 
     const rows = parseCsv(res.text);
     expect(rows.every((r) => r.is_winner === "false")).toBe(true);
@@ -145,7 +142,7 @@ describe("GET /api/v1/reports/:abTestId/export?format=csv", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`);
 
     expect(res.text).toContain(`"'=HYPERLINK(""http://evil.example"")"`);
   });
@@ -158,7 +155,7 @@ describe("GET /api/v1/reports/:abTestId/export?format=pdf", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=pdf`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`)
       .buffer(true)
       .parse(binaryParser);
 
@@ -174,7 +171,7 @@ describe("GET /api/v1/reports/:abTestId/export?format=pdf", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`)
       .buffer(true)
       .parse(binaryParser);
 
@@ -189,7 +186,7 @@ describe("report export access", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=xlsx`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`);
 
     expect(res.status).toBe(400);
   });
@@ -204,7 +201,7 @@ describe("report export access", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     expect(res.status).toBe(403);
   });
@@ -214,13 +211,13 @@ describe("report export access", () => {
 
     const res = await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(res.status).toBe(200);
   });
 
   it("returns 404 for a missing test and 400 for an invalid id", async () => {
-    const token = tokenFor("Admin");
+    const token = await tokenFor("Admin");
     const missing = await request(app)
       .get(`/api/v1/reports/${new mongoose.Types.ObjectId()}/export?format=csv`)
       .set("Authorization", `Bearer ${token}`);
@@ -237,7 +234,7 @@ describe("GET /api/v1/reports (export history)", () => {
   it("logs each export and lists the user's own history, newest first", async () => {
     const ownerId = new mongoose.Types.ObjectId().toString();
     const test = await createScoredTest(ownerId);
-    const token = tokenFor("Creator", ownerId);
+    const token = await tokenFor("Creator", ownerId);
 
     await request(app).get(`/api/v1/reports/${test._id}/export?format=csv`).set("Authorization", `Bearer ${token}`);
     await request(app)
@@ -263,11 +260,11 @@ describe("GET /api/v1/reports (export history)", () => {
 
     await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`);
 
     const res = await request(app)
       .get("/api/v1/reports")
-      .set("Authorization", `Bearer ${tokenFor("Manager")}`);
+      .set("Authorization", `Bearer ${await tokenFor("Manager")}`);
     expect(res.body.reports).toHaveLength(0);
   });
 
@@ -276,10 +273,10 @@ describe("GET /api/v1/reports (export history)", () => {
     const test = await createScoredTest(ownerId);
     await request(app)
       .get(`/api/v1/reports/${test._id}/export?format=csv`)
-      .set("Authorization", `Bearer ${tokenFor("Creator", ownerId)}`);
+      .set("Authorization", `Bearer ${await tokenFor("Creator", ownerId)}`);
 
-    const other = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Creator")}`);
-    const manager = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${tokenFor("Admin")}`);
+    const other = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${await tokenFor("Creator")}`);
+    const manager = await request(app).get("/api/v1/reports").set("Authorization", `Bearer ${await tokenFor("Admin")}`);
 
     expect(other.body.reports).toHaveLength(0);
     expect(manager.body.reports).toHaveLength(1);

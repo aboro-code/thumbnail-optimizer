@@ -17,8 +17,11 @@ const userSchema = new mongoose.Schema({
   manager_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   // Managers only: the code Creators enter to join their team.
   invite_code: { type: String, unique: true, sparse: true },
-  // Admins can deactivate an account; it can no longer sign in.
-  active: { type: Boolean, default: true },
+  // Only Admins can deactivate an account (D-38). Checked on every request (D-42).
+  status: { type: String, enum: ["active", "deactivated"], default: "active" },
+  // Simple audit of the last role change.
+  role_changed_at: { type: Date, default: null },
+  role_changed_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   created_at: { type: Date, default: Date.now },
 });
 

@@ -21,7 +21,7 @@ async function ensureInviteCode(manager) {
 
 async function findManagerByCode(code) {
   if (typeof code !== "string" || !code.trim()) return null;
-  return User.findOne({ invite_code: code.trim().toUpperCase(), role: "Manager", active: { $ne: false } });
+  return User.findOne({ invite_code: code.trim().toUpperCase(), role: "Manager", status: { $ne: "deactivated" } });
 }
 
 module.exports = { generateInviteCode, ensureInviteCode, findManagerByCode };
