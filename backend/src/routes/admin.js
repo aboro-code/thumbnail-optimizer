@@ -8,9 +8,11 @@ const ABTest = require("../models/ABTest");
 const ReportExport = require("../models/ReportExport");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { latestPredictions, predictionMatchedWinner } = require("../services/abtestReport");
+const { accountSummary, deleteAccount } = require("../services/accounts");
 
 const router = express.Router();
 const ROLES = ["Creator", "Manager", "Admin"];
+const STATUSES = ["active", "deactivated"];
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 router.use(requireAuth, requireRole("Admin"));
@@ -22,11 +24,13 @@ function signInMethod(user) {
 
 // GET /api/v1/admin/users - every account, with its manager and upload count.
 router.get("/users", async (req, res) => {
-  const [users, uploads] = await Promise.all([
+  const [users, uploads, teams] = await Promise.all([
     User.find().sort({ created_at: -1 }).lean(),
     Thumbnail.aggregate([{ $group: { _id: "$user_id", count: { $sum: 1 } } }]),
+    User.aggregate([{ $match: { manager_id: { $ne: null } } }, { $group: { _id: "$manager_id", count: { $sum: 1 } } }]),
   ]);
   const uploadsByUser = new Map(uploads.map((u) => [String(u._id), u.count]));
+  const teamSizes = new Map(teams.map((t) => [String(t._id), t.count]));
   const emailById = new Map(users.map((u) => [String(u._id), u.email]));
 
   res.json({
@@ -35,33 +39,39 @@ router.get("/users", async (req, res) => {
       email: u.email,
       name: u.name || null,
       role: u.role,
-      active: u.active !== false,
+      status: u.status || "active",
       sign_in: signInMethod(u),
       manager_id: u.manager_id || null,
       manager_email: u.manager_id ? emailById.get(String(u.manager_id)) || null : null,
       thumbnails: uploadsByUser.get(String(u._id)) || 0,
+      team_size: teamSizes.get(String(u._id)) || 0,
       created_at: u.created_at,
     })),
   });
 });
 
-// PATCH /api/v1/admin/users/:id  { role?, manager_id?, active? }
-// A role change takes effect at the user's next sign-in, because the role is inside their JWT.
+// PATCH /api/v1/admin/users/:id
+//   { role?, manager_id?, status?, reassign_to?, release_team? }
+// Takes effect on the user's next request: requireAuth reads role and status
+// from the database (D-42).
+// Demoting a Manager who still has creators needs a decision (D-46): move them
+// to another Manager (reassign_to) or release them (release_team: true).
+// Without either the API answers 409 with the team size.
 router.patch("/users/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ message: "Invalid user id" });
   }
-  const { role, manager_id: managerId, active } = req.body || {};
+  const { role, manager_id: managerId, status, reassign_to: reassignTo, release_team: releaseTeam } = req.body || {};
   const isSelf = req.params.id === req.user.sub;
 
   if (role !== undefined && !ROLES.includes(role)) {
     return res.status(400).json({ message: `role must be one of ${ROLES.join(", ")}` });
   }
-  if (active !== undefined && typeof active !== "boolean") {
-    return res.status(400).json({ message: "active must be true or false" });
+  if (status !== undefined && !STATUSES.includes(status)) {
+    return res.status(400).json({ message: `status must be one of ${STATUSES.join(", ")}` });
   }
   // Stops an Admin locking themselves out.
-  if (isSelf && ((role !== undefined && role !== "Admin") || active === false)) {
+  if (isSelf && ((role !== undefined && role !== "Admin") || status === "deactivated")) {
     return res.status(400).json({ message: "You can't remove your own admin access" });
   }
 
@@ -69,8 +79,33 @@ router.patch("/users/:id", async (req, res) => {
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const wasManager = user.role === "Manager";
-  if (role !== undefined) user.role = role;
-  if (active !== undefined) user.active = active;
+  const leavingManager = wasManager && role !== undefined && role !== "Manager";
+  let newManager = null;
+  if (leavingManager) {
+    const teamSize = await User.countDocuments({ manager_id: user._id });
+    if (teamSize > 0) {
+      if (reassignTo) {
+        if (!mongoose.isValidObjectId(reassignTo) || String(reassignTo) === String(user._id)) {
+          return res.status(400).json({ message: "reassign_to must be another Manager" });
+        }
+        newManager = await User.findOne({ _id: reassignTo, role: "Manager", status: { $ne: "deactivated" } });
+        if (!newManager) return res.status(400).json({ message: "reassign_to must be another active Manager" });
+      } else if (releaseTeam !== true) {
+        return res.status(409).json({
+          code: "TEAM_NOT_EMPTY",
+          team_size: teamSize,
+          message: `This manager has ${teamSize} creator${teamSize === 1 ? "" : "s"}. Move them to another manager or release them first.`,
+        });
+      }
+    }
+  }
+
+  if (role !== undefined && role !== user.role) {
+    user.role = role;
+    user.role_changed_at = new Date();
+    user.role_changed_by = req.user.sub;
+  }
+  if (status !== undefined) user.status = status;
 
   if (managerId !== undefined) {
     if (managerId === null || managerId === "") {
@@ -93,12 +128,42 @@ router.patch("/users/:id", async (req, res) => {
   if (user.role !== "Creator") user.manager_id = null;
 
   await user.save();
-  // A demoted Manager's team is released rather than left pointing at a non-manager.
   if (wasManager && user.role !== "Manager") {
-    await User.updateMany({ manager_id: user._id }, { $set: { manager_id: null } });
+    await User.updateMany(
+      { manager_id: user._id },
+      { $set: { manager_id: newManager ? newManager._id : null } }
+    );
   }
 
-  res.json({ id: user._id, role: user.role, active: user.active, manager_id: user.manager_id });
+  res.json({ id: user._id, role: user.role, status: user.status, manager_id: user.manager_id });
+});
+
+// GET /api/v1/admin/users/:id/summary - what deleting this account would remove.
+router.get("/users/:id/summary", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: "Invalid user id" });
+  }
+  const user = await User.findById(req.params.id).select("_id");
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json(await accountSummary(user._id));
+});
+
+// DELETE /api/v1/admin/users/:id - permanent (D-45). Admins can't be deleted,
+// including yourself; demote another Admin first if it really has to go.
+router.delete("/users/:id", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: "Invalid user id" });
+  }
+  if (req.params.id === req.user.sub) {
+    return res.status(400).json({ message: "You can't delete your own account" });
+  }
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.role === "Admin") {
+    return res.status(403).json({ message: "Admin accounts can't be deleted" });
+  }
+  const removed = await deleteAccount(user._id);
+  res.json({ deleted: true, removed });
 });
 
 // GET /api/v1/admin/analytics - system-wide totals (PRD §3.1 /admin/analytics).
@@ -107,7 +172,7 @@ router.get("/analytics", async (req, res) => {
   const [roles, inactive, thumbnails, uploadsThisWeek, scoredIds, predictions, testsByStatus, exportsByFormat, completed] =
     await Promise.all([
       User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
-      User.countDocuments({ active: false }),
+      User.countDocuments({ status: "deactivated" }),
       Thumbnail.countDocuments(),
       Thumbnail.countDocuments({ uploaded_at: { $gte: weekAgo } }),
       Prediction.distinct("thumbnail_id"),

@@ -207,7 +207,7 @@ describe("/api/v1/admin", () => {
     const row = res.body.users.find((u) => u.email === creator.email);
     expect(row.manager_email).toBe(manager.email);
     expect(row.thumbnails).toBe(1);
-    expect(row.active).toBe(true);
+    expect(row.status).toBe("active");
   });
 
   it("assigns a Creator to a Manager and rejects non-Manager targets", async () => {
@@ -230,7 +230,21 @@ describe("/api/v1/admin", () => {
     expect(bad.status).toBe(400);
   });
 
-  it("releases a Manager's team when they are demoted", async () => {
+  it("asks what to do with a Manager's team before demoting them", async () => {
+    const admin = await makeUser("Admin");
+    const manager = await makeUser("Manager");
+    await makeUser("Creator", { manager_id: manager._id });
+
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${manager._id}`)
+      .set(auth("Admin", admin._id))
+      .send({ role: "Creator" });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ code: "TEAM_NOT_EMPTY", team_size: 1 });
+    expect((await User.findById(manager._id)).role).toBe("Manager");
+  });
+
+  it("releases a demoted Manager's team when asked to", async () => {
     const admin = await makeUser("Admin");
     const manager = await makeUser("Manager");
     const creator = await makeUser("Creator", { manager_id: manager._id });
@@ -238,16 +252,33 @@ describe("/api/v1/admin", () => {
     await request(app)
       .patch(`/api/v1/admin/users/${manager._id}`)
       .set(auth("Admin", admin._id))
-      .send({ role: "Creator" })
+      .send({ role: "Creator", release_team: true })
       .expect(200);
 
     expect((await User.findById(creator._id)).manager_id).toBeNull();
+    const demoted = await User.findById(manager._id);
+    expect(String(demoted.role_changed_by)).toBe(String(admin._id));
+  });
+
+  it("moves a demoted Manager's team to another Manager", async () => {
+    const admin = await makeUser("Admin");
+    const manager = await makeUser("Manager");
+    const other = await makeUser("Manager");
+    const creator = await makeUser("Creator", { manager_id: manager._id });
+
+    await request(app)
+      .patch(`/api/v1/admin/users/${manager._id}`)
+      .set(auth("Admin", admin._id))
+      .send({ role: "Admin", reassign_to: String(other._id) })
+      .expect(200);
+
+    expect(String((await User.findById(creator._id)).manager_id)).toBe(String(other._id));
   });
 
   it("stops an Admin demoting or deactivating themselves", async () => {
     const admin = await makeUser("Admin");
     await request(app).patch(`/api/v1/admin/users/${admin._id}`).set(auth("Admin", admin._id)).send({ role: "Creator" }).expect(400);
-    await request(app).patch(`/api/v1/admin/users/${admin._id}`).set(auth("Admin", admin._id)).send({ active: false }).expect(400);
+    await request(app).patch(`/api/v1/admin/users/${admin._id}`).set(auth("Admin", admin._id)).send({ status: "deactivated" }).expect(400);
   });
 
   it("blocks sign-in for a deactivated account", async () => {
@@ -255,7 +286,7 @@ describe("/api/v1/admin", () => {
     await request(app).post("/api/v1/auth/signup").send({ email: "gone@example.com", password: "password123" }).expect(201);
     const user = await User.findOne({ email: "gone@example.com" });
 
-    await request(app).patch(`/api/v1/admin/users/${user._id}`).set(auth("Admin", admin._id)).send({ active: false }).expect(200);
+    await request(app).patch(`/api/v1/admin/users/${user._id}`).set(auth("Admin", admin._id)).send({ status: "deactivated" }).expect(200);
 
     const login = await request(app).post("/api/v1/auth/login").send({ email: "gone@example.com", password: "password123" });
     expect(login.status).toBe(403);
