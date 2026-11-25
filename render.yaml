@@ -1,0 +1,33 @@
+# Render Blueprint for the backend API (free web service).
+# The AI service isn't deployed yet: uploads, accounts, teams, A/B tests and
+# reports work; scoring answers "service unavailable" until AI_SERVICE_URL is set.
+# Note: the free plan's disk is temporary, so uploaded images are lost when the
+# service restarts or redeploys.
+services:
+  - type: web
+    name: thumbnail-optimizer-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false # MongoDB Atlas connection string
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 60m
+      - key: CORS_ORIGIN
+        sync: false # your Vercel URL, e.g. https://thumbnail-optimizer.vercel.app
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: TRUST_PROXY
+        value: "1"
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: GOOGLE_CLIENT_ID
+        sync: false # optional
