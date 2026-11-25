@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { api, setToken, setUser } from "../lib/api";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_SCRIPT_URL = "https://accounts.google.com/gsi/client";
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const notice = useLocation().state?.notice;
   const [submitting, setSubmitting] = useState(false);
   const googleButtonRef = useRef(null);
 
@@ -88,15 +90,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">Thumbnail Optimizer</p>
-        <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
+    <AuthLayout>
+        <h1 className="text-2xl">Sign in</h1>
         <p className="mt-1 text-sm text-muted-foreground">Score and test your thumbnails before you publish.</p>
+        {notice && (
+          <p role="status" className="mt-4 rounded-md border border-border bg-background px-3 py-2 text-sm">
+            {notice}
+          </p>
+        )}
 
         {GOOGLE_CLIENT_ID && (
           <div className="mt-6 flex flex-col items-center gap-4">
@@ -125,9 +126,8 @@ export default function LoginPage() {
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="password" className="text-sm font-medium">Password</label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               required
               value={password}
@@ -157,7 +157,6 @@ export default function LoginPage() {
             Create an account
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

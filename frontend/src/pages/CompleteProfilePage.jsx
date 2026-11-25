@@ -51,7 +51,7 @@ export default function CompleteProfilePage() {
       </div>
 
       <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">One last step</p>
+        <p className="text-sm font-medium text-primary">One last step</p>
         <h1 className="mt-2 text-2xl font-semibold">Set up your account</h1>
         <p className="mt-1 text-sm text-muted-foreground">Tell us a bit about you to finish creating your account.</p>
 

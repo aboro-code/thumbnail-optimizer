@@ -2,77 +2,199 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark is the default theme. Light is applied with data-theme="light" on <html>. */
+/*
+ * "Darkroom light table" (D-48). Dark is the default: the room under a red
+ * safelight. Light (data-theme="light") is the same lab with the lights on.
+ * Every text pair below meets WCAG AA (>= 4.5:1, PRD §3.4).
+ */
 :root {
-  --background: #0b1118;
-  --foreground: #edf2f8;
-  --card: #131b25;
-  --card-foreground: #edf2f8;
-  --popover: #1a2532;
-  --popover-foreground: #edf2f8;
-  --primary: #ff5c61;
-  --primary-foreground: #0b1118; /* white on #ff5c61 is only 3.0:1; this is 6.3:1 (WCAG AA) */
-  --secondary: #1a2532;
-  --secondary-foreground: #edf2f8;
-  --muted: #1a2532;
-  --muted-foreground: #abb6c4;
-  --accent: #22303f;
-  --accent-foreground: #edf2f8;
-  --destructive: hsl(0 84.2% 60.2%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: #263240;
-  --input: #2d3948;
-  --ring: #ff5c61;
-  --radius: 0.5rem;
-  --chart-1: #ff5c61;
-  --chart-2: #5083f1;
-  --chart-3: #fbbd23;
-  --chart-4: #36d399;
-  --chart-5: #a689fa;
-  --chart-muted: #4a5566; /* de-emphasised bars next to a --chart-2 highlight */
-  --font-sans: Inter, sans-serif;
-  --font-mono: Consolas, monospace;
+  --background: #17110f; /* the room */
+  --foreground: #f1e7da; /* fixed, washed paper */
+  --card: #221a17; /* developer tray */
+  --card-foreground: #f1e7da;
+  --popover: #2b221e;
+  --popover-foreground: #f1e7da;
+  --primary: #ef5a44; /* safelight red */
+  --primary-foreground: #17110f;
+  --secondary: #2b221e;
+  --secondary-foreground: #f1e7da;
+  --muted: #2b221e;
+  --muted-foreground: #bba999;
+  --accent: #33261f;
+  --accent-foreground: #f1e7da;
+  --destructive: #f26b5e;
+  --destructive-foreground: #17110f;
+  --border: #3d302a;
+  --input: #4a3b33;
+  --ring: #ef5a44;
+  --radius: 0.375rem;
+  --amber: #e9a23b; /* film edge print */
+  --film: #0f0b0a; /* film base, the same in both themes */
+  --table-glow: rgba(233, 162, 59, 0.16);
+  --chart-1: #ef5a44;
+  --chart-2: #5fb8a8; /* fixer-bath teal */
+  --chart-3: #e9a23b;
+  --chart-4: #4cc79a;
+  --chart-5: #b49af7;
+  --chart-muted: #5a4a41;
+  --font-sans: "Archivo", system-ui, sans-serif;
+  --font-mono: "Archivo", system-ui, sans-serif;
 }
 
-/* Light values darkened where needed so text meets WCAG AA (>= 4.5:1, PRD §3.4). */
 :root[data-theme="light"] {
-  --background: #f6f7f9;
-  --foreground: #1f252e;
-  --card: #ffffff;
-  --card-foreground: #1f252e;
+  --background: #e7e9e6; /* lab wall */
+  --foreground: #1e1a17;
+  --card: #fbfbf8; /* print paper */
+  --card-foreground: #1e1a17;
   --popover: #ffffff;
-  --popover-foreground: #1f252e;
-  --primary: #d71920;
+  --popover-foreground: #1e1a17;
+  --primary: #b3261e;
   --primary-foreground: #ffffff;
-  --secondary: #f0f2f5;
-  --secondary-foreground: #1f252e;
-  --muted: #f0f2f5;
-  --muted-foreground: #636b77;
-  --accent: #fdeded;
-  --accent-foreground: #b8141a;
-  --destructive: #c81e1e;
-  --destructive-foreground: hsl(210 40% 98%);
-  --border: #e4e8ec;
-  --input: #e4e8ec;
-  --ring: #d71920;
-  --radius: 0.5rem;
-  --chart-1: #d71920;
-  --chart-2: #2463eb;
-  --chart-3: #f59f0a;
+  --secondary: #eef0ec;
+  --secondary-foreground: #1e1a17;
+  --muted: #eef0ec;
+  --muted-foreground: #5d5750;
+  --accent: #f6e4df;
+  --accent-foreground: #8f1d17;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --border: #d3d6cf;
+  --input: #c9cdc5;
+  --ring: #b3261e;
+  --amber: #8a5300;
+  --film: #1b1513;
+  --table-glow: rgba(255, 244, 214, 0.9);
+  --chart-1: #b3261e;
+  --chart-2: #1d6f63;
+  --chart-3: #b06d00;
   --chart-4: #047857;
-  --chart-5: #895af6;
-  --chart-muted: #c3c9d1;
+  --chart-5: #7a4fd8;
+  --chart-muted: #c3c6bf;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-stretch: 100%;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Headlines: Archivo stretched wide and heavy, like a stencil on a film can. */
+h1 {
+  font-stretch: 118%;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 /* Visible keyboard focus on every interactive element (PRD §3.4 keyboard navigation). */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+@layer components {
+  .display {
+    font-stretch: 125%;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.02;
+  }
+
+  /* Numbers printed along a film's edge: condensed, amber. Used only for frame numbers. */
+  .edge-print {
+    font-stretch: 62%;
+    font-weight: 700;
+    color: #e9a23b; /* printed on the film itself, which is dark in both themes */
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+  }
+
+  .back-link {
+    @apply inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground;
+  }
+
+  /* The surface candidates sit on: a softly lit table. */
+  .light-table {
+    background: radial-gradient(120% 90% at 50% 0%, var(--table-glow), transparent 70%), var(--card);
+  }
+
+  /* A strip of film: sprocket holes along the top and bottom edges. */
+  .film-strip {
+    background-color: var(--film);
+    background-image: radial-gradient(circle at 50% 50%, rgba(241, 231, 218, 0.82) 0 2.5px, transparent 3px),
+      radial-gradient(circle at 50% 50%, rgba(241, 231, 218, 0.82) 0 2.5px, transparent 3px);
+    background-size: 18px 12px, 18px 12px;
+    background-position: 4px 3px, 4px calc(100% - 3px);
+    background-repeat: repeat-x, repeat-x;
+    padding: 18px 10px;
+    border-radius: 4px;
+  }
+
+  /* Crop marks: four corner brackets drawn around the chosen frame. */
+  .crop-marks {
+    position: relative;
+  }
+  .crop-marks::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    pointer-events: none;
+    --c: var(--primary);
+    background: linear-gradient(var(--c), var(--c)) top left / 14px 2px,
+      linear-gradient(var(--c), var(--c)) top left / 2px 14px,
+      linear-gradient(var(--c), var(--c)) top right / 14px 2px,
+      linear-gradient(var(--c), var(--c)) top right / 2px 14px,
+      linear-gradient(var(--c), var(--c)) bottom left / 14px 2px,
+      linear-gradient(var(--c), var(--c)) bottom left / 2px 14px,
+      linear-gradient(var(--c), var(--c)) bottom right / 14px 2px,
+      linear-gradient(var(--c), var(--c)) bottom right / 2px 14px;
+    background-repeat: no-repeat;
+  }
+
+  /* A loupe resting on the frame: the score under glass. */
+  .loupe {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 45%),
+      color-mix(in srgb, var(--film) 82%, transparent);
+    border: 3px solid #d9cbb8;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 6px 14px rgba(0, 0, 0, 0.45);
+    color: #fbf3e8;
+    font-weight: 800;
+    font-stretch: 85%;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    backdrop-filter: blur(2px);
+  }
+  .loupe-sm {
+    width: 2.6rem;
+    height: 2.6rem;
+    font-size: 0.8rem;
+    border-width: 2px;
+  }
+
+  /* Frames develop once when a batch loads (D-48). */
+  .develop {
+    animation: develop 1100ms ease-out both;
+  }
+}
+
+@keyframes develop {
+  from {
+    filter: sepia(1) brightness(0.35) contrast(1.6);
+  }
+  to {
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .develop {
+    animation: none;
+  }
 }

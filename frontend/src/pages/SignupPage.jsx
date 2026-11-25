@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api, setToken, setUser } from "../lib/api";
-import ThemeToggle from "../components/ThemeToggle";
+import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 
 const MIN_PASSWORD_LENGTH = 8;
 const INPUT_CLASS =
@@ -58,14 +59,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">Thumbnail Optimizer</p>
-        <h1 className="mt-2 text-2xl font-semibold">Create an account</h1>
+    <AuthLayout>
+        <h1 className="text-2xl">Create an account</h1>
         <p className="mt-1 text-sm text-muted-foreground">Score and test your thumbnails before you publish.</p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
@@ -96,9 +91,8 @@ export default function SignupPage() {
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="password" className="text-sm font-medium">Password</label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="new-password"
               required
               minLength={MIN_PASSWORD_LENGTH}
@@ -114,9 +108,8 @@ export default function SignupPage() {
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="confirm" className="text-sm font-medium">Confirm password</label>
-            <input
+            <PasswordInput
               id="confirm"
-              type="password"
               autoComplete="new-password"
               required
               value={confirm}
@@ -191,7 +184,6 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
-      </div>
-    </div>
+    </AuthLayout>
   );
 }

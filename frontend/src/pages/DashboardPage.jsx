@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { api, clearToken, clearUser, getUser } from "../lib/api";
+import { api, clearToken, clearUser, getUser, refreshUser, signOut as endSession } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
+import { EmptyFilmArt, Wordmark } from "../components/Art";
 import ThumbnailCard from "../components/ThumbnailCard";
 import { LoadingRegion, Skeleton } from "../components/Skeleton";
 
@@ -14,6 +15,7 @@ const NAV_LINKS = [
   { to: "/reports", label: "Reports" },
   { to: "/team", label: "Team", roles: ["Creator", "Manager"] },
   { to: "/admin", label: "Admin", roles: ["Admin"] },
+  { to: "/account", label: "Account" },
 ];
 
 // Says whose data the numbers cover, since a Manager's dashboard includes their team.
@@ -172,21 +174,25 @@ export default function DashboardPage() {
     };
   }, [navigate]);
 
-  function signOut() {
-    clearToken();
-    clearUser();
+  // Live role from the server, so Team/Admin links match what the backend allows.
+  const [user, setUserState] = useState(getUser());
+  useEffect(() => {
+    refreshUser().then(setUserState);
+  }, []);
+
+  async function signOut() {
+    await endSession();
     navigate("/login", { replace: true });
   }
 
   const lift = summary?.avg_predicted_lift;
-  const user = getUser();
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">Thumbnail Optimizer</p>
-          <h1 className="mt-1 text-2xl font-semibold">Dashboard</h1>
+          <Wordmark />
+          <h1 className="mt-4 text-3xl">Dashboard</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Main" className="flex flex-wrap gap-2">
@@ -255,16 +261,17 @@ export default function DashboardPage() {
               </h2>
               {thumbnails.length > RECENT_LIMIT && (
                 <Link to="/thumbnails" className="text-sm text-primary hover:underline">
-                  View all {thumbnails.length} →
+                  View all {thumbnails.length}
                 </Link>
               )}
             </div>
 
             {thumbnails.length === 0 ? (
               <div className="mt-4 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          <EmptyFilmArt className="mx-auto mb-4 w-48 max-w-full" />
                 No thumbnails uploaded yet.{" "}
                 <Link to="/thumbnails/new" className="text-primary hover:underline">
-                  Upload candidates →
+                  Upload candidates
                 </Link>
               </div>
             ) : (

@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, clearToken, clearUser, getUser } from "../lib/api";
 import { downloadReport } from "../lib/download";
 import ThemeToggle from "../components/ThemeToggle";
+import { EmptyFilmArt } from "../components/Art";
 import { RowListSkeleton } from "../components/Skeleton";
 
 const PRIVILEGED_ROLES = ["Manager", "Admin"];
@@ -62,7 +63,7 @@ export default function ReportsPage() {
     <div className="mx-auto min-h-screen max-w-4xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/dashboard" className="back-link">
             ← Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">Reports</h1>
@@ -90,6 +91,7 @@ export default function ReportsPage() {
 
       {reports && reports.length === 0 && (
         <div className="mt-8 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          <EmptyFilmArt className="mx-auto mb-4 w-48 max-w-full" />
           No reports exported yet. Open an{" "}
           <Link to="/abtests" className="text-primary hover:underline">
             A/B test

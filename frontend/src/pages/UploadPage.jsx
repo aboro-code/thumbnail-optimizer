@@ -92,7 +92,7 @@ export default function UploadPage() {
     <div className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/dashboard" className="back-link">
             ← Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">Upload candidates</h1>

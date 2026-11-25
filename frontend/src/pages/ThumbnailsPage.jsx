@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api, clearToken, clearUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
+import { EmptyFilmArt } from "../components/Art";
 import ThumbnailCard from "../components/ThumbnailCard";
 import { THUMBNAIL_STATUSES, statusLabel } from "../components/StatusPill";
 import { CardGridSkeleton } from "../components/Skeleton";
@@ -72,7 +73,7 @@ export default function ThumbnailsPage() {
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/dashboard" className="back-link">
             ← Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">Thumbnails</h1>
@@ -141,13 +142,15 @@ export default function ThumbnailsPage() {
 
           {thumbnails.length === 0 ? (
             <div className="mt-4 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          <EmptyFilmArt className="mx-auto mb-4 w-48 max-w-full" />
               No thumbnails uploaded yet.{" "}
               <Link to="/thumbnails/new" className="text-primary hover:underline">
-                Upload candidates →
+                Upload candidates
               </Link>
             </div>
           ) : visible.length === 0 ? (
             <div className="mt-4 rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          <EmptyFilmArt className="mx-auto mb-4 w-48 max-w-full" />
               No thumbnails match these filters.{" "}
               <button
                 type="button"

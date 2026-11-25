@@ -3,38 +3,35 @@ import { Link } from "react-router-dom";
 import { API_URL } from "../lib/api";
 import StatusPill from "./StatusPill";
 
-// The whole card opens the batch this thumbnail was uploaded with on the
-// Optimize page (/thumbnails/:id/optimize), scored or not.
+// A single frame of film (D-48). The whole card opens the batch this thumbnail
+// was uploaded with on the Optimize page (/thumbnails/:id/optimize), scored or not.
 export default function ThumbnailCard({ thumbnail: t }) {
   const scored = t.latest_ctr_score !== null && t.latest_ctr_score !== undefined;
   const title = t.content_title || "Untitled";
   return (
-    <li className="overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary focus-within:border-primary">
+    <li className="group">
       <Link
         to={`/thumbnails/${t._id}/optimize`}
         aria-label={`Open ${title} in Optimize`}
-        className="block focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+        className="block rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
       >
-        <div className="relative aspect-video w-full bg-muted">
-          <img
-            src={`${API_URL}${t.image_url}`}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-          {scored && (
-            <span className="absolute left-2 top-2 rounded-full bg-[color-mix(in_srgb,var(--background)_90%,transparent)] px-2 py-0.5 font-mono text-xs font-semibold tabular-nums">
-              <span className="sr-only">Predicted score </span>
-              {t.latest_ctr_score.toFixed(1)}
-            </span>
-          )}
+        <div className="film-strip transition-transform duration-200 group-hover:-translate-y-0.5">
+          <div className="relative aspect-video w-full overflow-hidden bg-muted">
+            <img src={`${API_URL}${t.image_url}`} alt="" loading="lazy" className="h-full w-full object-cover" />
+            {scored && (
+              <span className="loupe loupe-sm absolute right-2 top-2">
+                <span className="sr-only">Predicted score </span>
+                {Math.round(t.latest_ctr_score)}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 p-3">
+        <div className="flex items-start justify-between gap-2 px-1 pt-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{title}</p>
+            <p className="truncate text-sm font-semibold group-hover:text-primary">{title}</p>
             <p className="text-xs text-muted-foreground">
-              {new Date(t.uploaded_at).toLocaleDateString()}
-              {t.target_platform ? ` · ${t.target_platform}` : ""}
+              Uploaded {new Date(t.uploaded_at).toLocaleDateString()}
+              {t.target_platform ? `, for ${t.target_platform}` : ""}
             </p>
           </div>
           <StatusPill status={t.status} />
