@@ -7,22 +7,19 @@ process.env.UPLOAD_DIR = testUploadDir;
 process.env.AI_SERVICE_URL = "http://127.0.0.1:18321";
 
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const express = require("express");
 const multer = require("multer");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 const app = require("../src/server");
+const { tokenFor } = require("./helpers");
 const Thumbnail = require("../src/models/Thumbnail");
 const Prediction = require("../src/models/Prediction");
 
 let mongod;
 let mockAiServer;
 
-function tokenFor(role, sub = new mongoose.Types.ObjectId().toString()) {
-  return jwt.sign({ sub, role }, process.env.JWT_SECRET, { expiresIn: "1h" });
-}
 
 function startMockAiService() {
   const mockAi = express();
@@ -34,8 +31,11 @@ function startMockAiService() {
     res.json({
       ctr_score,
       explanation_signals: [`mock signal for ${title || "untitled"}`],
-      explanation_text: `mock explanation for ${title || "untitled"}`,
+      explanation_text: req.body.explain === "false" ? null : `mock explanation for ${title || "untitled"}`,
     });
+  });
+  mockAi.post("/api/v1/explain", express.json(), (req, res) => {
+    res.json({ explanation_text: `mock explanation for score ${req.body.ctr_score}` });
   });
   return new Promise((resolve) => {
     const server = mockAi.listen(18321, () => resolve(server));
@@ -79,7 +79,7 @@ describe("POST /api/v1/predictions/analyze", () => {
 
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({ thumbnail_ids: [low._id.toString(), high._id.toString()] });
 
     expect(res.status).toBe(200);
@@ -92,21 +92,49 @@ describe("POST /api/v1/predictions/analyze", () => {
     expect(highResult.ctr_score).toBe(90);
     expect(lowResult.ctr_score).toBe(40);
 
-    expect(highResult.explanation_text).toBe("mock explanation for score:90");
+    // Scores come back without waiting for the LLM (D-47).
+    expect(highResult.explanation_text).toBeNull();
+    expect(highResult.explanation_signals).toEqual(["mock signal for score:90"]);
 
     const saved = await Prediction.find({});
     expect(saved).toHaveLength(2);
-    const savedHigh = saved.find((p) => p.thumbnail_id.toString() === high._id.toString());
-    expect(savedHigh.explanation_text).toBe("mock explanation for score:90");
 
     const updatedThumb = await Thumbnail.findById(high._id);
     expect(updatedThumb.status).toBe("SCORED");
   });
 
+  it("writes the explanation afterwards with POST /predictions/explain, once", async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    const thumb = await createThumbnail(userId, { contentTitle: "score:70" });
+    const token = await tokenFor("Creator", userId);
+    await request(app).post("/api/v1/predictions/analyze").set("Authorization", `Bearer ${token}`).send({ thumbnail_ids: [String(thumb._id)] });
+
+    const res = await request(app)
+      .post("/api/v1/predictions/explain")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ thumbnail_id: String(thumb._id) })
+      .expect(200);
+    expect(res.body.explanation_text).toBe("mock explanation for score 70");
+    expect((await Prediction.findOne({ thumbnail_id: thumb._id })).explanation_text).toBe("mock explanation for score 70");
+
+    const other = await tokenFor("Creator");
+    await request(app).post("/api/v1/predictions/explain").set("Authorization", `Bearer ${other}`).send({ thumbnail_id: String(thumb._id) }).expect(403);
+  });
+
+  it("asks for a score before an explanation", async () => {
+    const userId = new mongoose.Types.ObjectId().toString();
+    const thumb = await createThumbnail(userId);
+    await request(app)
+      .post("/api/v1/predictions/explain")
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
+      .send({ thumbnail_id: String(thumb._id) })
+      .expect(409);
+  });
+
   it("rejects an empty thumbnail_ids array", async () => {
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({ thumbnail_ids: [] });
 
     expect(res.status).toBe(400);
@@ -115,7 +143,7 @@ describe("POST /api/v1/predictions/analyze", () => {
   it("rejects a malformed thumbnail id", async () => {
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({ thumbnail_ids: ["not-an-id"] });
 
     expect(res.status).toBe(400);
@@ -124,7 +152,7 @@ describe("POST /api/v1/predictions/analyze", () => {
   it("returns 404 when a thumbnail does not exist", async () => {
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({ thumbnail_ids: [new mongoose.Types.ObjectId().toString()] });
 
     expect(res.status).toBe(404);
@@ -136,7 +164,7 @@ describe("POST /api/v1/predictions/analyze", () => {
 
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator")}`)
       .send({ thumbnail_ids: [thumb._id.toString()] });
 
     expect(res.status).toBe(403);
@@ -148,7 +176,7 @@ describe("POST /api/v1/predictions/analyze", () => {
 
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Admin")}`)
+      .set("Authorization", `Bearer ${await tokenFor("Admin")}`)
       .send({ thumbnail_ids: [thumb._id.toString()] });
 
     expect(res.status).toBe(200);
@@ -164,7 +192,7 @@ describe("POST /api/v1/predictions/analyze", () => {
 
     const res = await request(app)
       .post("/api/v1/predictions/analyze")
-      .set("Authorization", `Bearer ${tokenFor("Creator", userId)}`)
+      .set("Authorization", `Bearer ${await tokenFor("Creator", userId)}`)
       .send({ thumbnail_ids: [thumb._id.toString()] });
 
     expect(res.status).toBe(502);

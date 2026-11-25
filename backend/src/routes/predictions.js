@@ -10,7 +10,7 @@ const { UPLOAD_DIR } = require("../config/uploadDir");
 const Thumbnail = require("../models/Thumbnail");
 const Prediction = require("../models/Prediction");
 
-const { canAccessAllOwners } = require("../services/access");
+const { canAccessAllOwners, canAccessOwner } = require("../services/access");
 
 const router = express.Router();
 
@@ -28,6 +28,8 @@ async function scoreOneThumbnail(thumbnail) {
   if (thumbnail.content_title) {
     form.append("content_title", thumbnail.content_title);
   }
+  // Score only (fast); the LLM sentence comes from POST /predictions/explain (D-47).
+  form.append("explain", "false");
 
   const response = await fetch(`${aiServiceUrl}/api/v1/score`, {
     method: "POST",
@@ -87,7 +89,7 @@ router.post("/analyze", requireAuth, async (req, res) => {
         ctr_score,
         rank,
         explanation_signals,
-        explanation_text,
+        explanation_text: explanation_text || null,
       });
       thumbnail.status = "SCORED";
       await thumbnail.save();
@@ -97,12 +99,53 @@ router.post("/analyze", requireAuth, async (req, res) => {
         ctr_score,
         rank,
         explanation_signals,
-        explanation_text,
+        explanation_text: explanation_text || null,
       };
     })
   );
 
   res.json({ results });
+});
+
+// POST /api/v1/predictions/explain  { thumbnail_id }
+// Writes (once) the plain-language explanation for a thumbnail's latest score.
+// Split from /analyze so scores show up in well under BR-001's 5 seconds while
+// the local LLM, which takes several seconds per image on a CPU, catches up.
+router.post("/explain", requireAuth, async (req, res) => {
+  const { thumbnail_id: thumbnailId } = req.body || {};
+  if (!mongoose.isValidObjectId(thumbnailId)) {
+    return res.status(400).json({ message: "thumbnail_id is required" });
+  }
+  const thumbnail = await Thumbnail.findById(thumbnailId);
+  if (!thumbnail) return res.status(404).json({ message: "Thumbnail not found" });
+  if (!(await canAccessOwner(req.user, thumbnail.user_id))) {
+    return res.status(403).json({ message: "Insufficient permissions" });
+  }
+
+  const prediction = await Prediction.findOne({ thumbnail_id: thumbnail._id }).sort({ scored_at: -1 });
+  if (!prediction) return res.status(409).json({ message: "Score this thumbnail first" });
+  if (prediction.explanation_text) {
+    return res.json({ thumbnail_id: thumbnail._id, explanation_text: prediction.explanation_text });
+  }
+
+  const aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  try {
+    const response = await fetch(`${aiServiceUrl}/api/v1/explain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ctr_score: prediction.ctr_score,
+        explanation_signals: prediction.explanation_signals,
+      }),
+    });
+    if (!response.ok) throw new Error(`AI service returned ${response.status}`);
+    const { explanation_text: text } = await response.json();
+    prediction.explanation_text = text;
+    await prediction.save();
+    res.json({ thumbnail_id: thumbnail._id, explanation_text: text });
+  } catch (err) {
+    res.status(502).json({ message: "The explanation service is unavailable" });
+  }
 });
 
 module.exports = router;

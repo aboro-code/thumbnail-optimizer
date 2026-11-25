@@ -80,3 +80,39 @@ def test_score_still_works_if_the_local_model_is_unreachable(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert "clear focal face present" in body["explanation_text"]
+
+
+def test_score_without_explanation_skips_the_llm(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("the LLM must not be called when explain=false")
+
+    monkeypatch.setattr(httpx, "post", fail_if_called)
+
+    with open(os.path.join(FIXTURES_DIR, "face_sample.jpg"), "rb") as f:
+        response = client.post(
+            "/api/v1/score",
+            files={"file": ("face_sample.jpg", f, "image/jpeg")},
+            data={"explain": "false"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["explanation_text"] is None
+    assert "clear focal face present" in body["explanation_signals"]
+
+
+def test_explain_writes_the_sentence_for_an_existing_score(monkeypatch):
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _FakeOllamaResponse())
+
+    response = client.post(
+        "/api/v1/explain",
+        json={"ctr_score": 72.5, "explanation_signals": ["clear focal face present"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["explanation_text"].startswith("This thumbnail scores well")
+
+
+def test_explain_rejects_an_out_of_range_score():
+    response = client.post("/api/v1/explain", json={"ctr_score": 120, "explanation_signals": []})
+    assert response.status_code == 422
