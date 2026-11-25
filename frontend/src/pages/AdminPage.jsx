@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api, clearToken, clearUser, getUser } from "../lib/api";
 import ThemeToggle from "../components/ThemeToggle";
+import { DeleteUserDialog, PromoteAdminDialog, TeamDecisionDialog } from "../components/AdminUserDialogs";
 import BarList from "../components/BarList";
 import { LoadingRegion, Skeleton } from "../components/Skeleton";
 
@@ -34,7 +35,7 @@ function useAdminFetch(path) {
       }
       setError(
         err.response?.status === 403
-          ? "Your session doesn't have admin rights. Sign out and in again if your role just changed."
+          ? "Your account doesn't have admin rights any more."
           : "Could not load this section. Is the backend running?"
       );
     }
@@ -53,6 +54,8 @@ function UsersTab() {
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState(null);
   const [message, setMessage] = useState({ text: "", isError: false });
+  // An open dialog: { type: "team" | "admin" | "delete", user, role? }
+  const [pending, setPending] = useState(null);
 
   const managers = useMemo(() => (data?.users || []).filter((u) => u.role === "Manager"), [data]);
   const visible = useMemo(() => {
@@ -76,6 +79,17 @@ function UsersTab() {
     }
   }
 
+  function requestRole(user, role) {
+    if (role === user.role) return;
+    if (role === "Admin") {
+      setPending({ type: "admin", user, role });
+    } else if (user.role === "Manager" && user.team_size > 0) {
+      setPending({ type: "team", user, role });
+    } else {
+      update(user, { role }, `role set to ${role}`);
+    }
+  }
+
   if (error) return <p role="alert" className="mt-6 text-sm text-destructive">{error}</p>;
   if (!data) {
     return (
@@ -89,7 +103,7 @@ function UsersTab() {
     <section aria-label="Users" className="mt-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {data.users.length} accounts. Role changes apply at the user's next sign-in.
+          {data.users.length} accounts. Changes apply straight away, on the user&apos;s next click.
         </p>
         <label htmlFor="user-search" className="sr-only">Search users</label>
         <input
@@ -116,10 +130,16 @@ function UsersTab() {
                 <p className="truncate text-sm font-medium">
                   {u.name || u.email}
                   {isSelf && <span className="ml-2 text-xs font-normal text-muted-foreground">(you)</span>}
+                  {u.status === "deactivated" && (
+                    <span className="ml-2 rounded-full border border-destructive px-2 py-0.5 text-xs font-medium text-destructive">
+                      Deactivated
+                    </span>
+                  )}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {u.name ? `${u.email} · ` : ""}
-                  {u.sign_in} · {u.thumbnails} {u.thumbnails === 1 ? "upload" : "uploads"} · joined{" "}
+                  {u.sign_in} · {u.thumbnails} {u.thumbnails === 1 ? "upload" : "uploads"}
+                  {u.role === "Manager" ? ` · team of ${u.team_size}` : ""} · joined{" "}
                   {new Date(u.created_at).toLocaleDateString()}
                 </p>
               </div>
@@ -130,7 +150,7 @@ function UsersTab() {
                   id={`role-${u.id}`}
                   value={u.role}
                   disabled={saving || isSelf}
-                  onChange={(e) => update(u, { role: e.target.value }, `role set to ${e.target.value}`)}
+                  onChange={(e) => requestRole(u, e.target.value)}
                   className={SELECT_CLASS}
                 >
                   {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -163,23 +183,75 @@ function UsersTab() {
                 <button
                   type="button"
                   disabled={saving || isSelf}
-                  onClick={() =>
-                    update(u, { active: !u.active }, u.active ? "deactivated" : "reactivated")
-                  }
+                  onClick={() => {
+                    const active = u.status !== "deactivated";
+                    update(u, { status: active ? "deactivated" : "active" }, active ? "deactivated" : "reactivated");
+                  }}
                   className={`rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
-                    u.active
+                    u.status !== "deactivated"
                       ? "border-border bg-card hover:border-destructive hover:text-destructive"
                       : "border-destructive text-destructive hover:bg-card"
                   }`}
                 >
-                  {u.active ? "Deactivate" : "Reactivate"}
+                  {u.status !== "deactivated" ? "Deactivate" : "Reactivate"}
                 </button>
+                {u.role !== "Admin" && !isSelf && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setPending({ type: "delete", user: u })}
+                    className="rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-destructive hover:text-destructive disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    Delete…
+                  </button>
+                )}
               </div>
             </li>
           );
         })}
         {visible.length === 0 && <li className="p-6 text-center text-sm text-muted-foreground">No users match.</li>}
       </ul>
+
+      {pending?.type === "team" && (
+        <TeamDecisionDialog
+          user={pending.user}
+          newRole={pending.role}
+          managers={managers}
+          onCancel={() => setPending(null)}
+          onConfirm={(choice) => {
+            const { user, role } = pending;
+            setPending(null);
+            update(user, { role, ...choice }, `role set to ${role}`);
+          }}
+        />
+      )}
+      {pending?.type === "admin" && (
+        <PromoteAdminDialog
+          user={pending.user}
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            const { user } = pending;
+            if (user.role === "Manager" && user.team_size > 0) {
+              setPending({ type: "team", user, role: "Admin" });
+            } else {
+              setPending(null);
+              update(user, { role: "Admin" }, "role set to Admin");
+            }
+          }}
+        />
+      )}
+      {pending?.type === "delete" && (
+        <DeleteUserDialog
+          user={pending.user}
+          onCancel={() => setPending(null)}
+          onDeleted={async () => {
+            const { user } = pending;
+            setPending(null);
+            await reload();
+            setMessage({ text: `${user.email} was deleted.`, isError: false });
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -324,7 +396,7 @@ export default function AdminPage() {
     <div className="mx-auto min-h-screen max-w-5xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/dashboard" className="back-link">
             ← Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">Admin</h1>

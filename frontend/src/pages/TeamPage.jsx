@@ -85,7 +85,7 @@ function ManagerView({ team, onChange, onError }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{m.name || m.email}</p>
                   {m.name && <p className="truncate text-xs text-muted-foreground">{m.email}</p>}
-                  {!m.active && <p className="text-xs text-destructive">Deactivated</p>}
+                  {m.status === "deactivated" &&<p className="text-xs text-destructive">Deactivated</p>}
                 </div>
                 <button type="button" onClick={() => remove(m)} disabled={busy} className={SECONDARY_BUTTON}>
                   Remove
@@ -206,7 +206,7 @@ export default function TeamPage() {
     <div className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/dashboard" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/dashboard" className="back-link">
             ← Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">Team</h1>

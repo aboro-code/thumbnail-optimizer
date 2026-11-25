@@ -5,7 +5,8 @@ export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 const TOKEN_KEY = "thumbnail-optimizer-token";
 const USER_KEY = "thumbnail-optimizer-user";
 
-export const api = axios.create({ baseURL: `${API_URL}/api/v1` });
+// withCredentials sends the httpOnly refresh-token cookie to /auth/refresh.
+export const api = axios.create({ baseURL: `${API_URL}/api/v1`, withCredentials: true });
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -74,3 +75,86 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Ends the session on the server (deletes the refresh token) and locally.
+export async function signOut() {
+  try {
+    await api.post("/auth/logout");
+  } catch (err) {
+    // offline or already signed out: clear locally anyway
+  }
+  clearToken();
+  clearUser();
+}
+
+// Re-reads the signed-in user (live role, team, status) so the nav matches
+// what the backend enforces (D-42).
+export async function refreshUser() {
+  try {
+    const res = await api.get("/auth/me");
+    setUser(res.data.user);
+    return res.data.user;
+  } catch (err) {
+    return getUser();
+  }
+}
+
+// One refresh at a time, shared by every request that hit an expired token.
+let refreshing = null;
+function refreshAccessToken() {
+  if (!refreshing) {
+    refreshing = api
+      .post("/auth/refresh", null, { _skipRefresh: true })
+      .then((res) => {
+        setToken(res.data.token);
+        setUser(res.data.user);
+        return res.data.token;
+      })
+      .finally(() => {
+        refreshing = null;
+      });
+  }
+  return refreshing;
+}
+
+const NO_REFRESH_PATHS = ["/auth/login", "/auth/signup", "/auth/google", "/auth/refresh", "/auth/logout"];
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const { config, response } = error;
+    const code = response?.data?.code;
+
+    if (response?.status === 403 && code === "ACCOUNT_DEACTIVATED") {
+      clearToken();
+      clearUser();
+      if (window.location.pathname !== "/deactivated") window.location.assign("/deactivated");
+      return Promise.reject(error);
+    }
+
+    // Expired access token: get a new one from the refresh cookie, retry once.
+    const canRefresh =
+      response?.status === 401 &&
+      code === "TOKEN_INVALID" &&
+      config &&
+      !config._retried &&
+      !config._skipRefresh &&
+      !NO_REFRESH_PATHS.some((p) => config.url?.startsWith(p));
+    if (canRefresh) {
+      try {
+        const token = await refreshAccessToken();
+        config._retried = true;
+        config.headers.Authorization = `Bearer ${token}`;
+        return api(config);
+      } catch (refreshError) {
+        if (refreshError.response?.data?.code === "ACCOUNT_DEACTIVATED") {
+          clearToken();
+          clearUser();
+          window.location.assign("/deactivated");
+        }
+        return Promise.reject(error);
+      }
+    }
+    return Promise.reject(error);
+  }
+);

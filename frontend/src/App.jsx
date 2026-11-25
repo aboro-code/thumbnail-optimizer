@@ -1,10 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import ABTestDetailPage from "./pages/ABTestDetailPage";
+import AccountPage from "./pages/AccountPage";
 import ABTestsListPage from "./pages/ABTestsListPage";
 import AdminPage from "./pages/AdminPage";
 import CompleteProfilePage from "./pages/CompleteProfilePage";
 import DashboardPage from "./pages/DashboardPage";
+import DeactivatedPage from "./pages/DeactivatedPage";
 import LoginPage from "./pages/LoginPage";
 import OptimizePage from "./pages/OptimizePage";
 import ReportsPage from "./pages/ReportsPage";
@@ -30,6 +32,15 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/deactivated" element={<DeactivatedPage />} />
+        <Route
+          path="/account"
+          element={
+            <RequireAuth>
+              <AccountPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/team"
           element={

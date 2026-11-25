@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { api, API_URL, clearToken, clearUser, getUser } from "../lib/api";
+import { api, API_URL, clearToken, clearUser } from "../lib/api";
 import { downloadReport } from "../lib/download";
 import ThemeToggle from "../components/ThemeToggle";
 import BarList from "../components/BarList";
 import StatusPill from "../components/StatusPill";
 import { LoadingRegion, Skeleton } from "../components/Skeleton";
 
-const PRIVILEGED_ROLES = ["Manager", "Admin"];
 
 function VariantRow({ variant, label, abTestId, isWinner, isPredicted, onSaved, onUnauthorized }) {
   const thumb = variant.thumbnail_id; // populated by the backend
@@ -269,7 +268,6 @@ export default function ABTestDetailPage() {
   const [test, setTest] = useState(null);
   const [error, setError] = useState("");
   const [closeResult, setCloseResult] = useState(null);
-  const user = getUser();
   const predictedIdx = test ? predictedIndex(test.variants) : null;
 
   const handleUnauthorized = useCallback(() => {
@@ -307,7 +305,7 @@ export default function ABTestDetailPage() {
     <div className="mx-auto min-h-screen max-w-3xl px-4 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to="/abtests" className="font-mono text-xs uppercase tracking-widest text-primary hover:underline">
+          <Link to="/abtests" className="back-link">
             ← A/B tests
           </Link>
           <h1 className="mt-1 text-2xl font-semibold">{test?.content_reference || "A/B test"}</h1>
@@ -336,7 +334,15 @@ export default function ABTestDetailPage() {
 
           <ResultsCharts test={test} predictedIdx={predictedIdx} />
 
-          <h2 className="mt-8 text-lg font-semibold">Variants</h2>
+          <div className="mt-8 flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">Variants</h2>
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              Entered manually
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Impressions and clicks are typed in here. They aren't synced from YouTube or any other platform.
+          </p>
           <ul className="mt-3 flex flex-col gap-4">
             {test.variants.map((variant, idx) => (
               <VariantRow
@@ -367,7 +373,8 @@ export default function ABTestDetailPage() {
             </div>
           )}
 
-          {test.status === "RUNNING" && !closeResult && user && PRIVILEGED_ROLES.includes(user.role) && (
+          {/* Anyone who can see the test can close it: its owner, their manager, or an Admin (D-43). */}
+          {test.status === "RUNNING" && !closeResult && (
             <CloseTestPanel
               abTestId={test._id}
               onClosed={(data) => {
